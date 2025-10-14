@@ -18,11 +18,11 @@ function toEvents(projects) {
 export default function CalendarView({ projects, onEventClick }) {
   const events = useMemo(() => toEvents(projects), [projects])
   return (
-    <div className="bg-white rounded border p-2">
+    <div className="bg-white rounded border p-2 sm:p-3">
       <FullCalendar
         plugins={[dayGridPlugin, interactionPlugin]}
         initialView="dayGridMonth"
-        height={700}
+        height="auto"
         eventClick={(info) => onEventClick(info.event.id)}
         events={events}
         headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
@@ -32,4 +32,3 @@ export default function CalendarView({ projects, onEventClick }) {
     </div>
   )
 }
-

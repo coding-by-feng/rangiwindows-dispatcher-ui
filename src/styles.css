@@ -12,3 +12,37 @@
   max-width: 1200px;
 }
 
+/* Mobile responsiveness */
+@media (max-width: 640px) {
+  /* FullCalendar header and cells on small screens */
+  .fc .fc-toolbar-title {
+    font-size: 1rem;
+  }
+  .fc .fc-toolbar.fc-header-toolbar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .fc .fc-daygrid-day-number {
+    font-size: 0.75rem;
+  }
+  .fc .fc-daygrid-event {
+    font-size: 0.75rem;
+    line-height: 1.1;
+    padding: 1px 2px;
+  }
+  .fc .fc-button {
+    padding: 2px 8px;
+    font-size: 0.75rem;
+  }
+
+  /* Ant Table compactness */
+  .ant-table {
+    font-size: 12px;
+  }
+  .ant-table-thead > tr > th,
+  .ant-table-tbody > tr > td {
+    padding: 6px 8px;
+  }
+
+  /* Modal and Drawer paddings are adjusted inline via components, keep minimal here */
+}

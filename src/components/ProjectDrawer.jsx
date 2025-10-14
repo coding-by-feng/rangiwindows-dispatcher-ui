@@ -1,9 +1,11 @@
 import React from 'react'
-import { Descriptions, Drawer, Form, Input, Select, Upload, Button, Space } from 'antd'
+import { Descriptions, Drawer, Form, Input, Select, Upload, Button, Space, Grid } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
 
 export default function ProjectDrawer({ open, project, onClose, onSave, onUpload }) {
   const [form] = Form.useForm()
+  const screens = Grid.useBreakpoint()
+  const isMobile = !screens.sm
 
   React.useEffect(() => {
     form.setFieldsValue(project)
@@ -15,7 +17,7 @@ export default function ProjectDrawer({ open, project, onClose, onSave, onUpload
   }
 
   return (
-    <Drawer open={open} onClose={onClose} width={520} title={`项目详情 ${project?.project_code || ''}`} destroyOnClose>
+    <Drawer open={open} onClose={onClose} width={isMobile ? '100%' : 520} title={`项目详情 ${project?.project_code || ''}`} destroyOnClose>
       {project && (
         <Space direction="vertical" className="w-full" size="large">
           <Descriptions bordered column={1} size="small">
@@ -69,4 +71,3 @@ export default function ProjectDrawer({ open, project, onClose, onSave, onUpload
     </Drawer>
   )
 }
-

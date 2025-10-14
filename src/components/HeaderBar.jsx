@@ -6,17 +6,17 @@ const { Title } = Typography
 
 export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF, status, onStatusChange }) {
   return (
-    <div className="w-full bg-white border-b px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 bg-cyan-600 text-white rounded flex items-center justify-center font-bold">RW</div>
-        <Title level={4} style={{ margin: 0 }}>Rangi Windows 施工安排系统</Title>
+    <div className="w-full bg-white border-b px-3 sm:px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sticky top-0 z-10">
+      <div className="flex items-center gap-2 sm:gap-3">
+        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-cyan-600 text-white rounded flex items-center justify-center font-bold">RW</div>
+        <Title level={4} style={{ margin: 0 }} className="!text-base sm:!text-xl">Rangi Windows 施工安排系统</Title>
       </div>
-      <div className="flex items-center gap-3">
-        <Input.Search allowClear placeholder="搜索项目/客户/地址" onSearch={onSearch} className="w-80" />
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+        <Input.Search allowClear placeholder="搜索项目/客户/地址" onSearch={onSearch} className="w-full sm:w-80" />
         <Select
           allowClear
           placeholder="状态筛选"
-          className="w-32"
+          className="w-full sm:w-32"
           value={status}
           onChange={onStatusChange}
           options={[
@@ -25,7 +25,7 @@ export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF,
             { label: '完成', value: '完成' },
           ]}
         />
-        <Space>
+        <Space wrap>
           <Button icon={<FileExcelOutlined />} onClick={onExportExcel}>导出Excel</Button>
           <Button icon={<FilePdfOutlined />} onClick={onExportPDF}>导出PDF</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>新增项目</Button>
@@ -34,4 +34,3 @@ export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF,
     </div>
   )
 }
-

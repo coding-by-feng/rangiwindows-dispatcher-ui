@@ -15,6 +15,10 @@
 
 import dayjs from 'dayjs'
 
+// Runtime API configuration via Vite env
+export const API_MODE = (import.meta?.env?.VITE_API_MODE || 'local')
+export const API_BASE = (import.meta?.env?.VITE_API_BASE || 'http://kiwi-microservice')
+
 // ---------- Local storage store (no backend) ----------
 const LS_KEY = 'rw_projects'
 

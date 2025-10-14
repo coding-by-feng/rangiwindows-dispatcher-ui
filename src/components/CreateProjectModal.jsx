@@ -1,9 +1,11 @@
 import React from 'react'
-import { Modal, Form, Input, DatePicker, Select } from 'antd'
+import { Modal, Form, Input, DatePicker, Select, Grid } from 'antd'
 import dayjs from 'dayjs'
 
 export default function CreateProjectModal({ open, onCancel, onOk }) {
   const [form] = Form.useForm()
+  const screens = Grid.useBreakpoint()
+  const isMobile = !screens.sm
 
   const handleOk = async () => {
     const values = await form.validateFields()
@@ -39,6 +41,8 @@ export default function CreateProjectModal({ open, onCancel, onOk }) {
       onOk={handleOk}
       onCancel={handleCancel}
       okText="创建"
+      width={isMobile ? '100%' : 720}
+      styles={{ body: { padding: isMobile ? 12 : 24 } }}
       destroyOnClose
     >
       <Form
@@ -46,47 +50,49 @@ export default function CreateProjectModal({ open, onCancel, onOk }) {
         layout="vertical"
         initialValues={{ status: '未开始' }}
       >
-        <Form.Item name="name" label="项目名称" rules={[{ required: true, message: '请输入项目名称' }]}>
-          <Input placeholder="例如：Greenlane House" />
-        </Form.Item>
-        <Form.Item name="address" label="地址" rules={[{ required: true, message: '请输入地址' }]}>
-          <Input placeholder="例如：123 Greenlane Rd" />
-        </Form.Item>
-        <Form.Item name="client_name" label="客户姓名" rules={[{ required: true, message: '请输入客户姓名' }]}>
-          <Input />
-        </Form.Item>
-        <Form.Item name="client_phone" label="客户电话" rules={[{ required: true, message: '请输入客户电话' }]}>
-          <Input />
-        </Form.Item>
-        <Form.Item name="sales_person" label="销售负责人" rules={[{ required: true, message: '请输入销售负责人' }]}>
-          <Input placeholder="如：Tim" />
-        </Form.Item>
-        <Form.Item name="installer" label="安装负责人" rules={[{ required: true, message: '请输入安装负责人' }]}>
-          <Input placeholder="如：Peter" />
-        </Form.Item>
-        <Form.Item name="team_members" label="团队成员">
-          <Input placeholder="逗号分隔：Peter, Jack" />
-        </Form.Item>
-        <Form.Item name="dates" label="施工日期" rules={[{ required: true, message: '请选择施工日期' }]}>
-          <DatePicker.RangePicker format="YYYY-MM-DD" />
-        </Form.Item>
-        <Form.Item name="status" label="状态">
-          <Select
-            options={[
-              { label: '未开始', value: '未开始' },
-              { label: '施工中', value: '施工中' },
-              { label: '完成', value: '完成' },
-            ]}
-          />
-        </Form.Item>
-        <Form.Item name="today_task" label="今日任务">
-          <Input.TextArea rows={2} placeholder="例如：安装窗框（12个）" />
-        </Form.Item>
-        <Form.Item name="progress_note" label="状态备注">
-          <Input.TextArea rows={3} placeholder="进度说明、完成百分比等" />
-        </Form.Item>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Form.Item name="name" label="项目名称" rules={[{ required: true, message: '请输入项目名称' }]}>
+            <Input placeholder="例如：Greenlane House" />
+          </Form.Item>
+          <Form.Item name="address" label="地址" rules={[{ required: true, message: '请输入地址' }]} className="sm:col-span-2">
+            <Input placeholder="例如：123 Greenlane Rd" />
+          </Form.Item>
+          <Form.Item name="client_name" label="客户姓名" rules={[{ required: true, message: '请输入客户姓名' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="client_phone" label="客户电话" rules={[{ required: true, message: '请输入客户电话' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="sales_person" label="销售负责人" rules={[{ required: true, message: '请输入销售负责人' }]}>
+            <Input placeholder="如：Tim" />
+          </Form.Item>
+          <Form.Item name="installer" label="安装负责人" rules={[{ required: true, message: '请输入安装负责人' }]}>
+            <Input placeholder="如：Peter" />
+          </Form.Item>
+          <Form.Item name="team_members" label="团队成员" className="sm:col-span-2">
+            <Input placeholder="逗号分隔：Peter, Jack" />
+          </Form.Item>
+          <Form.Item name="dates" label="施工日期" rules={[{ required: true, message: '请选择施工日期' }]} className="sm:col-span-2">
+            <DatePicker.RangePicker format="YYYY-MM-DD" className="w-full" />
+          </Form.Item>
+          <Form.Item name="status" label="状态">
+            <Select
+              options={[
+                { label: '未开始', value: '未开始' },
+                { label: '施工中', value: '施工中' },
+                { label: '完成', value: '完成' },
+              ]}
+            />
+          </Form.Item>
+          <div className="sm:col-span-2" />
+          <Form.Item name="today_task" label="今日任务" className="sm:col-span-2">
+            <Input.TextArea rows={2} placeholder="例如：安装窗框（12个）" />
+          </Form.Item>
+          <Form.Item name="progress_note" label="状态备注" className="sm:col-span-2">
+            <Input.TextArea rows={3} placeholder="进度说明、完成百分比等" />
+          </Form.Item>
+        </div>
       </Form>
     </Modal>
   )
 }
-
