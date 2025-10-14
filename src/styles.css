@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* FullCalendar tweaks */
+.fc .fc-daygrid-event {
+  white-space: normal;
+}
+
+/* App container adjustments */
+.container {
+  max-width: 1200px;
+}
+
