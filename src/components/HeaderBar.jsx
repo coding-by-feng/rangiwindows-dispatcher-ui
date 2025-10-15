@@ -1,10 +1,10 @@
 import React from 'react'
-import { Button, Input, Space, Typography, Select } from 'antd'
+import { Button, Input, Space, Typography, Select, Switch } from 'antd'
 import { FileExcelOutlined, FilePdfOutlined, PlusOutlined } from '@ant-design/icons'
 
 const { Title } = Typography
 
-export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF, status, onStatusChange }) {
+export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF, status, onStatusChange, includeArchived = false, onToggleIncludeArchived }) {
   return (
     <div className="w-full bg-white border-b px-3 sm:px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sticky top-0 z-10">
       <div className="flex items-center gap-2 sm:gap-3">
@@ -25,6 +25,10 @@ export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF,
             { label: '完成', value: '完成' },
           ]}
         />
+        <div className="flex items-center gap-1">
+          <Switch size="small" checked={includeArchived} onChange={onToggleIncludeArchived} />
+          <span className="text-xs text-slate-600">显示归档</span>
+        </div>
         <Space wrap>
           <Button icon={<FileExcelOutlined />} onClick={onExportExcel}>导出Excel</Button>
           <Button icon={<FilePdfOutlined />} onClick={onExportPDF}>导出PDF</Button>

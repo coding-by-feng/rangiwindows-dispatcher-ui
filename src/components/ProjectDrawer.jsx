@@ -1,8 +1,8 @@
 import React from 'react'
-import { Descriptions, Drawer, Form, Input, Select, Upload, Button, Space, Grid } from 'antd'
-import { UploadOutlined } from '@ant-design/icons'
+import { Descriptions, Drawer, Form, Input, Select, Upload, Button, Space, Grid, Tag, Popconfirm } from 'antd'
+import { UploadOutlined, DeleteOutlined, InboxOutlined } from '@ant-design/icons'
 
-export default function ProjectDrawer({ open, project, onClose, onSave, onUpload }) {
+export default function ProjectDrawer({ open, project, onClose, onSave, onUpload, onArchive, onDelete }) {
   const [form] = Form.useForm()
   const screens = Grid.useBreakpoint()
   const isMobile = !screens.sm
@@ -16,8 +16,20 @@ export default function ProjectDrawer({ open, project, onClose, onSave, onUpload
     onSave(values)
   }
 
+  const handleArchive = () => {
+    if (!project) return
+    onArchive?.(!project.archived)
+  }
+
+  const handleDeleteConfirm = () => { onDelete?.() }
+
   return (
-    <Drawer open={open} onClose={onClose} width={isMobile ? '100%' : 520} title={`项目详情 ${project?.project_code || ''}`} destroyOnClose>
+    <Drawer open={open} onClose={onClose} width={isMobile ? '100%' : 520} title={(
+      <div className="flex items-center gap-2">
+        <span>项目详情 {project?.project_code || ''}</span>
+        {project?.archived ? <Tag>已归档</Tag> : null}
+      </div>
+    )} destroyOnClose>
       {project && (
         <Space direction="vertical" className="w-full" size="large">
           <Descriptions bordered column={1} size="small">
@@ -45,9 +57,13 @@ export default function ProjectDrawer({ open, project, onClose, onSave, onUpload
                 ]}
               />
             </Form.Item>
-            <Space>
+            <Space wrap>
               <Button type="primary" onClick={onFinish}>保存</Button>
               <Button onClick={onClose}>关闭</Button>
+              <Button icon={<InboxOutlined />} onClick={handleArchive}>{project.archived ? '取消归档' : '归档'}</Button>
+              <Popconfirm title="确认删除该项目？" okText="确定" cancelText="取消" onConfirm={handleDeleteConfirm} okButtonProps={{ 'data-testid': 'confirm-delete' }}>
+                <Button danger icon={<DeleteOutlined />}>删除</Button>
+              </Popconfirm>
             </Space>
           </Form>
 
