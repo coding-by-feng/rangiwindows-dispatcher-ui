@@ -7,6 +7,7 @@ import { test, expect } from '@playwright/test'
 // - Opens the Create Project modal
 
 test.describe('Rangi Windows UI smoke', () => {
+  // @ts-ignore
   test('loads and opens Create Project modal', async ({ page }) => {
     await page.goto('/')
 

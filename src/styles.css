@@ -12,6 +12,18 @@
   max-width: 1200px;
 }
 
+/* Make Ant Select label click reliably open dropdown by letting clicks pass through value span */
+.ant-select .ant-select-selection-item {
+  pointer-events: none;
+}
+
+/* Ensure DatePicker panels are usable on small screens */
+.ant-picker-dropdown .ant-picker-panels,
+.ant-picker-dropdown .ant-picker-panel-container {
+  max-height: 70vh;
+  overflow: auto;
+}
+
 /* Mobile responsiveness */
 @media (max-width: 640px) {
   /* FullCalendar header and cells on small screens */
