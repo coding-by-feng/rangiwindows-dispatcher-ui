@@ -11,18 +11,19 @@
 import dayjs from 'dayjs'
 import axios from 'axios'
 import i18n from './i18n'
+import { ENV_DEFAULT_MODE, API_BASE_FALLBACK, API_BASE_PROD, API_BASE_TEST, IS_DEV } from './config'
 
 // Env defaults
-const ENV_DEFAULT_MODE = (import.meta?.env?.VITE_API_MODE || 'local')
-const API_BASE_FALLBACK = (import.meta?.env?.VITE_API_BASE || 'http://kiwi-microservice:9005')
-const API_BASE_PROD = (import.meta?.env?.VITE_API_BASE_PROD || API_BASE_FALLBACK)
-const API_BASE_TEST = (import.meta?.env?.VITE_API_BASE_TEST || 'http://kiwi-microservice-local:9005')
-const isDev = !!import.meta?.env?.DEV
+const ENV_DEFAULT_MODE_LOCAL = ENV_DEFAULT_MODE
+const API_BASE_FALLBACK_LOCAL = API_BASE_FALLBACK
+const API_BASE_PROD_LOCAL = API_BASE_PROD
+const API_BASE_TEST_LOCAL = API_BASE_TEST
+const isDev = IS_DEV
 
 // Persisted runtime mode
 const LS_MODE_KEY = 'rw_api_mode'
 function readMode() {
-  try { return localStorage.getItem(LS_MODE_KEY) || ENV_DEFAULT_MODE } catch { return ENV_DEFAULT_MODE }
+  try { return localStorage.getItem(LS_MODE_KEY) || ENV_DEFAULT_MODE_LOCAL } catch { return ENV_DEFAULT_MODE_LOCAL }
 }
 function normalizeMode(m) { return (m === 'backend' || m === 'backend-dev') ? 'backend-test' : m }
 let currentMode = normalizeMode(readMode())
@@ -32,9 +33,9 @@ function resolveAxiosBase(mode) {
   if (mode === 'local') return ''
   // Keep using dev proxy for legacy 'backend' mode to support local BE via Vite proxy
   if (isDev && (mode === 'backend' || mode === 'backend-dev')) return ''
-  if (mode === 'backend-test') return API_BASE_TEST
-  if (mode === 'backend-prod' || mode === 'backend') return API_BASE_PROD
-  return API_BASE_PROD
+  if (mode === 'backend-test') return API_BASE_TEST_LOCAL
+  if (mode === 'backend-prod' || mode === 'backend') return API_BASE_PROD_LOCAL
+  return API_BASE_PROD_LOCAL
 }
 
 // Helper/debug utilities
@@ -42,10 +43,10 @@ function logBases(context) {
   if (!isDev || typeof window === 'undefined') return
   const resolved = resolveAxiosBase(currentMode) || '(same-origin proxy or local)'
   // eslint-disable-next-line no-console
-  console.info(`[API] ${context}: mode=${currentMode}, test=${API_BASE_TEST}, prod=${API_BASE_PROD}, resolved=${resolved}`)
+  console.info(`[API] ${context}: mode=${currentMode}, test=${API_BASE_TEST_LOCAL}, prod=${API_BASE_PROD_LOCAL}, resolved=${resolved}`)
 }
 export function getApiBases() {
-  return { mode: currentMode, test: API_BASE_TEST, prod: API_BASE_PROD, fallback: API_BASE_FALLBACK, resolved: resolveAxiosBase(currentMode) }
+  return { mode: currentMode, test: API_BASE_TEST_LOCAL, prod: API_BASE_PROD_LOCAL, fallback: API_BASE_FALLBACK_LOCAL, resolved: resolveAxiosBase(currentMode) }
 }
 
 let http = axios.create({ baseURL: resolveAxiosBase(currentMode) })

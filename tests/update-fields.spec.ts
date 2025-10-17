@@ -14,7 +14,7 @@ test.describe('Project update payload', () => {
 
   // @ts-ignore
   test('posts all fields when editing in drawer', async ({ page }) => {
-    const host = 'kiwi-microservice-local:9005'
+    const host = 'localhost:9005'
 
     let current = {
       id: 301,

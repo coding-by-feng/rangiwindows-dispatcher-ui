@@ -2,7 +2,7 @@
 
 React + Vite + Tailwind CSS + Ant Design + FullCalendar.
 
-This app uses a real backend by default. Backend hostname: http://kiwi-microservice
+This app uses a real backend by default. Backend hostname: http://192.168.1.120
 
 ## Features
 - Calendar view: shows project name / installer / status; click to open details.
@@ -14,7 +14,7 @@ This app uses a real backend by default. Backend hostname: http://kiwi-microserv
 
 ## Development
 1) Ensure the backend is reachable at:
-   - http://kiwi-microservice
+   - http://192.168.1.120
 
 2) Install dependencies:
 ```bash
@@ -31,10 +31,10 @@ Default URL: http://localhost:5173
 Env (already configured):
 - .env.development
   - VITE_API_MODE=backend
-  - VITE_API_BASE=http://kiwi-microservice
+  - VITE_API_BASE=http://192.168.1.120
 - .env.test (for Playwright)
   - VITE_API_MODE=local
-  - VITE_API_BASE=http://kiwi-microservice
+  - VITE_API_BASE=http://192.168.1.120
 
 ## Production
 ```bash
@@ -43,15 +43,15 @@ npm run preview
 ```
 At runtime, set:
 - VITE_API_MODE=backend
-- VITE_API_BASE=http://kiwi-microservice  # or your deployed BE URL
+- VITE_API_BASE=http://192.168.1.120  # or your deployed BE URL
 
 ## API modes
-- backend (default): real REST APIs on http://kiwi-microservice
+- backend (default): real REST APIs on http://192.168.1.120
 - local: offline fallback using localStorage (used by tests)
 
 Switch via environment:
 - VITE_API_MODE=backend | local
-- VITE_API_BASE=http://kiwi-microservice
+- VITE_API_BASE=http://192.168.1.120
 
 ## Data storage and reset
 - Backend mode: server DB/storage (see BE spec).
@@ -83,7 +83,7 @@ Project fields:
 Dates are YYYY-MM-DD strings.
 
 ## Backend API requirements (copy-paste for implementation)
-Base URL: http://kiwi-microservice
+Base URL: http://192.168.1.120
 All JSON responses use UTF-8. File exports return binary with correct Content-Type and Content-Disposition.
 
 Entity: Project
@@ -226,19 +226,19 @@ The frontend now uses English status codes in payloads/filters and renders Chine
 
 Examples
 - Archive:
-  - PATCH http://kiwi-microservice/api/projects/101
+  - PATCH http://192.168.1.120/api/projects/101
     { "archived": true }
 - Unarchive:
-  - PATCH http://kiwi-microservice/api/projects/101
+  - PATCH http://192.168.1.120/api/projects/101
     { "archived": false }
 - Delete:
-  - DELETE http://kiwi-microservice/api/projects/101
+  - DELETE http://192.168.1.120/api/projects/101
     204 No Content
 - List excluding archived (default):
-  - GET http://kiwi-microservice/api/projects?q=Queen&status=施工中
+  - GET http://192.168.1.120/api/projects?q=Queen&status=施工中
 - List including archived:
-  - GET http://kiwi-microservice/api/projects?q=Queen&status=施工中&archived=true
+  - GET http://192.168.1.120/api/projects?q=Queen&status=施工中&archived=true
 - Export (excluding archived):
-  - GET http://kiwi-microservice/api/projects/export/excel?start=2025-03-01&end=2025-03-31
+  - GET http://192.168.1.120/api/projects/export/excel?start=2025-03-01&end=2025-03-31
 - Export including archived:
-  - GET http://kiwi-microservice/api/projects/export/pdf?start=2025-03-01&end=2025-03-31&archived=true
+  - GET http://192.168.1.120/api/projects/export/pdf?start=2025-03-01&end=2025-03-31&archived=true

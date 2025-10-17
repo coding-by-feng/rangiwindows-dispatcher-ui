@@ -20,6 +20,7 @@
   "btn.uploadPhoto": "上传照片",
   "btn.viewPhoto": "查看已上传照片",
   "btn.more": "更多",
+  "btn.deleteAllPhotos": "删除全部照片",
   "btn.collapse": "收起",
   "drawer.title": "项目详情",
   "tag.archived": "已归档",
