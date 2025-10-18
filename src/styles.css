@@ -58,3 +58,19 @@
 
   /* Modal and Drawer paddings are adjusted inline via components, keep minimal here */
 }
+
+/* Mobile single-month RangePicker popup tweaks */
+.mobile-single-month-picker .ant-picker-panels,
+.mobile-single-month-picker .ant-picker-panel-container {
+  display: block !important;
+}
+.mobile-single-month-picker .ant-picker-panels > .ant-picker-panel:nth-child(2),
+.mobile-single-month-picker .ant-picker-panel-container > .ant-picker-panel:nth-child(2) {
+  display: none !important;
+}
+.mobile-single-month-picker .ant-picker-panel {
+  width: auto !important;
+}
+.mobile-single-month-picker .ant-picker-dropdown {
+  min-width: 280px;
+}

@@ -7,16 +7,10 @@ import zhCnLocale from '@fullcalendar/core/locales/zh-cn'
 import zhTwLocale from '@fullcalendar/core/locales/zh-tw'
 import { useTranslation } from 'react-i18next'
 import { Grid } from 'antd'
+import { normalizeStatus } from '../utils/status'
 
 function toEvents(projects, t) {
   const list = Array.isArray(projects) ? projects : []
-  const normalizeStatus = (s) => {
-    if (!s) return s
-    if (s === '未开始') return 'not_started'
-    if (s === '施工中') return 'in_progress'
-    if (s === '完成') return 'completed'
-    return s
-  }
   const label = (raw) => {
     const code = normalizeStatus(raw)
     if (code === 'not_started' || code === 'in_progress' || code === 'completed') {
@@ -41,27 +35,34 @@ export default function CalendarView({ projects, onEventClick }) {
 
   const screens = Grid.useBreakpoint()
   const isMobile = !screens.sm
-  const viewName = isMobile ? 'dayGridWeek' : 'dayGridMonth'
 
   return (
-    <div className="bg-white rounded border p-2 sm:p-3 overflow-x-auto">
-      <div style={{ minWidth: isMobile ? 520 : 'auto' }}>
-        <FullCalendar
-          key={viewName}
-          plugins={[dayGridPlugin, interactionPlugin]}
-          initialView={viewName}
-          height="auto"
-          dayMaxEventRows={isMobile ? 2 : 4}
-          dayMaxEvents={true}
-          moreLinkClick="popover"
-          dayHeaderFormat={isMobile ? { weekday: 'short' } : undefined}
-          eventClick={(info) => onEventClick(info.event.id)}
-          events={events}
-          headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
-          locales={[zhCnLocale, zhTwLocale]}
-          locale={localeStr}
-        />
+      <div className="bg-white rounded border p-2 sm:p-3 overflow-x-auto">
+        <div style={{ minWidth: 'auto' }}>
+          <FullCalendar
+              plugins={[dayGridPlugin, interactionPlugin]}
+              initialView="dayGridMonth"
+              height="auto"
+              dayMaxEventRows={isMobile ? 1 : 4}
+              dayMaxEvents={true}
+              moreLinkClick="popover"
+              dayHeaderFormat={isMobile ? { weekday: 'narrow' } : undefined}
+              eventClick={(info) => onEventClick(info.event.id)}
+              events={events}
+              headerToolbar={{
+                left: 'prev,next',
+                center: 'title',
+                right: isMobile ? '' : 'today'
+              }}
+              locales={[zhCnLocale, zhTwLocale]}
+              locale={localeStr}
+              // Only show the current month (hide days from prev/next months)
+              fixedWeekCount={false}
+              showNonCurrentDates={false}
+              contentHeight={isMobile ? 'auto' : undefined}
+              aspectRatio={isMobile ? 1 : 1.35}
+          />
+        </div>
       </div>
-    </div>
   )
 }

@@ -2,19 +2,13 @@ import React from 'react'
 import { Table, Tag, Grid, Empty, Pagination } from 'antd'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
+import { normalizeStatus } from '../utils/status'
 
 export default function ProjectTable({ projects = [], loading, onRowClick, pagination }) {
   const screens = Grid.useBreakpoint()
   const isMobile = !screens.sm
   const { t } = useTranslation()
 
-  const normalizeStatus = (s) => {
-    if (!s) return s
-    if (s === '未开始') return 'not_started'
-    if (s === '施工中') return 'in_progress'
-    if (s === '完成') return 'completed'
-    return s
-  }
   const statusColor = (codeRaw) => {
     const code = normalizeStatus(codeRaw)
     return code === 'completed' ? 'green' : code === 'in_progress' ? 'blue' : 'default'

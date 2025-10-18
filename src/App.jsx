@@ -1,12 +1,12 @@
 import React from 'react'
-import { ConfigProvider, App as AntdApp } from 'antd'
+import { ConfigProvider, App as AntdApp, Tour } from 'antd'
 import dayjs from 'dayjs'
 import HeaderBar from './components/HeaderBar'
 import CalendarView from './components/CalendarView'
 import ProjectTable from './components/ProjectTable'
 import ProjectDrawer from './components/ProjectDrawer'
 import CreateProjectModal from './components/CreateProjectModal'
-import { listProjects, createProject, updateProject, uploadPhoto, exportExcel, exportPDF, getProject, archiveProject, deleteProject, getApiMode, setApiMode, seedAucklandDemos, listProjectPhotos, deleteProjectPhoto, getPhotoDownloadUrl, deleteAllProjectPhotos } from './api'
+import { listProjects, createProject, updateProject, uploadPhoto, exportExcel, exportPDF, getProject, archiveProject, deleteProject, getApiMode, setApiMode, seedAucklandDemos, listProjectPhotos, deleteProjectPhoto, deleteAllProjectPhotos } from './api'
 import { useTranslation } from 'react-i18next'
 import { setAppLanguage, getAppLanguage } from './i18n'
 import zhCN from 'antd/es/locale/zh_CN'
@@ -36,10 +36,27 @@ function AppContent() {
   const [uploadLoading, setUploadLoading] = React.useState(false)
   const [exportExcelLoading, setExportExcelLoading] = React.useState(false)
   const [exportPDFLoading, setExportPDFLoading] = React.useState(false)
+  const [tourOpen, setTourOpen] = React.useState(false)
 
   // Normalize legacy modes to show in UI as backend-test
   const toDisplayMode = React.useCallback((m) => (m === 'backend' || m === 'backend-dev') ? 'backend-test' : m, [])
   const [mode, setMode] = React.useState(() => toDisplayMode(getApiMode?.() || 'local'))
+  const [modeReady, setModeReady] = React.useState(false)
+
+  // Ensure runtime mode honors any value pre-set in localStorage (e.g., by Playwright addInitScript)
+  React.useLayoutEffect(() => {
+    try {
+      const m = localStorage.getItem('rw_api_mode')
+      if (m) {
+        setApiMode?.(m)
+        setMode(toDisplayMode(m))
+      }
+    } catch {}
+    setModeReady(true)
+    // Kick off an immediate fetch once mode is applied
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    ;(async () => { try { await fetchData() } catch {} })()
+  }, [toDisplayMode])
 
   const fetchData = async (params = {}) => {
     setLoading(true)
@@ -63,7 +80,8 @@ function AppContent() {
     }
   }
 
-  React.useEffect(() => { fetchData() }, [q, status, includeArchived, page, pageSize])
+  React.useEffect(() => { fetchData() }, [])
+  React.useEffect(() => { if (modeReady) fetchData() }, [modeReady, q, status, includeArchived, page, pageSize])
 
   // Reset page to 1 on filter changes
   React.useEffect(() => { setPage(1) }, [q, status, includeArchived])
@@ -264,6 +282,50 @@ function AppContent() {
     setAppLanguage(lng)
   }
 
+  const qs = React.useCallback((selector) => document.querySelector(selector), [])
+  const tourSteps = React.useMemo(() => [
+    {
+      title: t('tour.mode.title'),
+      description: t('tour.mode.desc'),
+      target: () => qs('[data-tour-id="mode-select"]'),
+      placement: 'bottom'
+    },
+    {
+      title: t('tour.lang.title'),
+      description: t('tour.lang.desc'),
+      target: () => qs('[data-tour-id="lang-select"]'),
+      placement: 'bottom'
+    },
+    {
+      title: t('tour.search.title'),
+      description: t('tour.search.desc'),
+      target: () => qs('[data-tour-id="search-input"]'),
+      placement: 'bottom'
+    },
+    {
+      title: t('tour.export.title'),
+      description: t('tour.export.desc'),
+      target: () => qs('[data-tour-id="export-excel"]') || qs('[data-tour-id="export-pdf"]'),
+      placement: 'bottom'
+    },
+    {
+      title: t('tour.add.title'),
+      description: t('tour.add.desc'),
+      target: () => qs('[data-tour-id="add-project"]'),
+      placement: 'bottom'
+    },
+    {
+      title: t('tour.calendar.title'),
+      description: t('tour.calendar.desc'),
+      target: () => qs('[data-tour-id="calendar-view"]')
+    },
+    {
+      title: t('tour.table.title'),
+      description: t('tour.table.desc'),
+      target: () => qs('[data-tour-id="project-table"]')
+    }
+  ], [t, qs])
+
   return (
     <div className="min-h-screen flex flex-col">
       <HeaderBar
@@ -282,11 +344,14 @@ function AppContent() {
         onSeedDemo={onSeedDemo}
         lang={lang}
         onLangChange={onLangChange}
+        onStartTour={() => setTourOpen(true)}
       />
 
       <div className="container mx-auto p-3 sm:p-4 flex flex-col gap-4">
-        <CalendarView projects={projects} onEventClick={onOpenProject} />
-        <div className="bg-white rounded border p-3">
+        <div data-tour-id="calendar-view">
+          <CalendarView projects={projects} onEventClick={onOpenProject} />
+        </div>
+        <div className="bg-white rounded border p-3" data-tour-id="project-table">
           <ProjectTable
             projects={projects}
             loading={loading}
@@ -319,6 +384,8 @@ function AppContent() {
         onOk={onCreate}
         confirmLoading={createLoading}
       />
+
+      <Tour open={tourOpen} onClose={() => setTourOpen(false)} steps={tourSteps} mask closable />
     </div>
   )
 }

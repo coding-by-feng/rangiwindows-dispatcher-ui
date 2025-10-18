@@ -108,5 +108,21 @@
   "validation.requiredDates": "Please select date range",
 
   "btn.deleteAllPhotos": "Delete All Photos",
-  "modal.deleteAllPhotos.confirm": "Delete all photos for this project?"
+  "modal.deleteAllPhotos.confirm": "Delete all photos for this project?",
+
+  "btn.tour": "Guide",
+  "tour.mode.title": "API Mode",
+  "tour.mode.desc": "Switch data source: local mock or real backend (test/prod).",
+  "tour.lang.title": "Language",
+  "tour.lang.desc": "Switch the app language here.",
+  "tour.search.title": "Search",
+  "tour.search.desc": "Search by project, client, or address.",
+  "tour.export.title": "Export",
+  "tour.export.desc": "Download the monthly schedule as Excel or PDF.",
+  "tour.add.title": "Create Project",
+  "tour.add.desc": "Add a new project from here.",
+  "tour.calendar.title": "Calendar",
+  "tour.calendar.desc": "Overview of projects in the month. Click an event to open details.",
+  "tour.table.title": "Project List",
+  "tour.table.desc": "Detailed table view; click a row to open the drawer."
 }

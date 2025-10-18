@@ -37,71 +37,74 @@ export default function CreateProjectModal({ open, onCancel, onOk, confirmLoadin
   }
 
   return (
-    <Modal
-      title={t('modal.create.title')}
-      open={open}
-      onOk={handleOk}
-      onCancel={handleCancel}
-      okText={t('modal.create.ok')}
-      confirmLoading={confirmLoading}
-      width={isMobile ? '100%' : 720}
-      styles={{ body: { padding: isMobile ? 12 : 24 } }}
-      destroyOnHidden
-    >
-      <Form
-        form={form}
-        layout="vertical"
-        initialValues={{ status: 'not_started' }}
+      <Modal
+          title={t('modal.create.title')}
+          open={open}
+          onOk={handleOk}
+          onCancel={handleCancel}
+          okText={t('modal.create.ok')}
+          confirmLoading={confirmLoading}
+          width={isMobile ? '100%' : 720}
+          styles={{ body: { padding: isMobile ? 12 : 24 } }}
+          destroyOnHidden
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Form.Item name="name" label={t('field.projectName')} rules={[{ required: true, message: t('validation.requiredProjectName') }]}>
-            <Input placeholder={t('placeholder.projectName')} />
-          </Form.Item>
-          <Form.Item name="address" label={t('field.address')} rules={[{ required: true, message: t('validation.requiredAddress') }]} className="sm:col-span-2">
-            <Input placeholder={t('placeholder.address')} />
-          </Form.Item>
-          <Form.Item name="client_name" label={t('field.clientName')} rules={[{ required: true, message: t('validation.requiredClientName') }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="client_phone" label={t('field.clientPhone')} rules={[{ required: true, message: t('validation.requiredClientPhone') }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="sales_person" label={t('field.salesPerson')} rules={[{ required: true, message: t('validation.requiredSalesPerson') }]}>
-            <Input placeholder={t('placeholder.salesPerson')} />
-          </Form.Item>
-          <Form.Item name="installer" label={t('field.installer')} rules={[{ required: true, message: t('validation.requiredInstaller') }]}>
-            <Input placeholder={t('placeholder.installer')} />
-          </Form.Item>
-          <Form.Item name="team_members" label={t('field.teamMembers')} className="sm:col-span-2">
-            <Input placeholder={t('placeholder.teamMembers')} />
-          </Form.Item>
-          <Form.Item name="dates" label={t('field.dateRange')} rules={[{ required: true, message: t('validation.requiredDates') }]} className="sm:col-span-2">
-            {/* Render popup to body to avoid clipping/viewport issues on mobile */}
-            <DatePicker.RangePicker
-              format="YYYY-MM-DD"
-              className="w-full"
-              getPopupContainer={() => document.body}
-              placement="topLeft"
-            />
-          </Form.Item>
-          <Form.Item name="status" label={t('field.status')}>
-            <Select
-              options={[
-                { label: t('status.not_started'), value: 'not_started' },
-                { label: t('status.in_progress'), value: 'in_progress' },
-                { label: t('status.completed'), value: 'completed' },
-              ]}
-            />
-          </Form.Item>
-          <div className="sm:col-span-2" />
-          <Form.Item name="today_task" label={t('field.todayTask')} className="sm:col-span-2">
-            <Input.TextArea rows={2} placeholder={t('placeholder.todayTask')} />
-          </Form.Item>
-          <Form.Item name="progress_note" label={t('field.progressNote')} className="sm:col-span-2">
-            <Input.TextArea rows={3} placeholder={t('placeholder.progressNote')} />
-          </Form.Item>
-        </div>
-      </Form>
-    </Modal>
+        <Form
+            form={form}
+            layout="vertical"
+            initialValues={{ status: 'not_started' }}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Form.Item name="name" label={t('field.projectName')} rules={[{ required: true, message: t('validation.requiredProjectName') }]}>
+              <Input placeholder={t('placeholder.projectName')} />
+            </Form.Item>
+            <Form.Item name="address" label={t('field.address')} rules={[{ required: true, message: t('validation.requiredAddress') }]} className="sm:col-span-2">
+              <Input placeholder={t('placeholder.address')} />
+            </Form.Item>
+            <Form.Item name="client_name" label={t('field.clientName')} rules={[{ required: true, message: t('validation.requiredClientName') }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="client_phone" label={t('field.clientPhone')} rules={[{ required: true, message: t('validation.requiredClientPhone') }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="sales_person" label={t('field.salesPerson')} rules={[{ required: true, message: t('validation.requiredSalesPerson') }]}>
+              <Input placeholder={t('placeholder.salesPerson')} />
+            </Form.Item>
+            <Form.Item name="installer" label={t('field.installer')} rules={[{ required: true, message: t('validation.requiredInstaller') }]}>
+              <Input placeholder={t('placeholder.installer')} />
+            </Form.Item>
+            <Form.Item name="team_members" label={t('field.teamMembers')} className="sm:col-span-2">
+              <Input placeholder={t('placeholder.teamMembers')} />
+            </Form.Item>
+            <Form.Item name="dates" label={t('field.dateRange')} rules={[{ required: true, message: t('validation.requiredDates') }]} className="sm:col-span-2">
+              {/* Show only 1 month on mobile devices */}
+              <DatePicker.RangePicker
+                  format="YYYY-MM-DD"
+                  className="w-full"
+                  getPopupContainer={() => document.body}
+                  placement="topLeft"
+                  classNames={isMobile ? {
+                    popup: 'mobile-single-month-picker'
+                  } : undefined}
+              />
+            </Form.Item>
+            <Form.Item name="status" label={t('field.status')}>
+              <Select
+                  options={[
+                    { label: t('status.not_started'), value: 'not_started' },
+                    { label: t('status.in_progress'), value: 'in_progress' },
+                    { label: t('status.completed'), value: 'completed' },
+                  ]}
+              />
+            </Form.Item>
+            <div className="sm:col-span-2" />
+            <Form.Item name="today_task" label={t('field.todayTask')} className="sm:col-span-2">
+              <Input.TextArea rows={2} placeholder={t('placeholder.todayTask')} />
+            </Form.Item>
+            <Form.Item name="progress_note" label={t('field.progressNote')} className="sm:col-span-2">
+              <Input.TextArea rows={3} placeholder={t('placeholder.progressNote')} />
+            </Form.Item>
+          </div>
+        </Form>
+      </Modal>
   )
 }

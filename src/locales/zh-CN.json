@@ -107,5 +107,21 @@
   "validation.requiredClientPhone": "请输入客户电话",
   "validation.requiredSalesPerson": "请输入销售负责人",
   "validation.requiredInstaller": "请输入安装负责人",
-  "validation.requiredDates": "请选择施工日期"
+  "validation.requiredDates": "请选择施工日期",
+
+  "btn.tour": "使用引导",
+  "tour.mode.title": "接口模式",
+  "tour.mode.desc": "在此切换数据来源：本地或真实后端（测试/生产）。",
+  "tour.lang.title": "语言切换",
+  "tour.lang.desc": "在此切换应用语言。",
+  "tour.search.title": "搜索",
+  "tour.search.desc": "可按项目、客户或地址搜索。",
+  "tour.export.title": "导出",
+  "tour.export.desc": "将当月安排导出为 Excel 或 PDF。",
+  "tour.add.title": "新建项目",
+  "tour.add.desc": "从这里新增一个项目。",
+  "tour.calendar.title": "日历视图",
+  "tour.calendar.desc": "按月查看项目，点击事件可打开详情。",
+  "tour.table.title": "项目列表",
+  "tour.table.desc": "表格详细信息，点击行打开右侧抽屉。"
 }

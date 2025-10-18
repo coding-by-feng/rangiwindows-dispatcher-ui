@@ -4,6 +4,7 @@ import { UploadOutlined, DeleteOutlined, InboxOutlined } from '@ant-design/icons
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { getPhotoDownloadUrl } from '../api'
+import { normalizeStatus } from '../utils/status'
 
 export default function ProjectDrawer({ open, project, photos = [], onClose, onSave, onUpload, onArchive, onDelete, onDeletePhoto, onDeleteAllPhotos, saving = false, archiving = false, deleting = false, uploading = false }) {
   const [form] = Form.useForm()
@@ -28,13 +29,6 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
     return typeof v === 'string' ? v : ''
   }, [])
 
-  const normalizeStatus = (s) => {
-    if (!s) return s
-    if (s === '未开始') return 'not_started'
-    if (s === '施工中') return 'in_progress'
-    if (s === '完成') return 'completed'
-    return s
-  }
   const isCompleted = normalizeStatus(project?.status) === 'completed'
 
   React.useEffect(() => {
@@ -169,7 +163,15 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
                   <Input placeholder={t('placeholder.teamMembers')} disabled={isCompleted} />
                 </Form.Item>
                 <Form.Item name="dates" label={t('field.dateRange')} rules={[{ required: true, message: t('validation.requiredDates') }]}>
-                  <DatePicker.RangePicker format="YYYY-MM-DD" className="w-full" getPopupContainer={() => document.body} disabled={isCompleted} />
+                  <DatePicker.RangePicker
+                    format="YYYY-MM-DD"
+                    className="w-full"
+                    getPopupContainer={() => document.body}
+                    placement="topLeft"
+                    inputReadOnly
+                    classNames={isMobile ? { popup: 'mobile-single-month-picker' } : undefined}
+                    disabled={isCompleted}
+                  />
                 </Form.Item>
                 <Form.Item name="status" label={t('field.status')}>
                   <Select disabled={isCompleted} options={statusOptions} onChange={() => setShowNotes(true)} getPopupContainer={() => document.body} />

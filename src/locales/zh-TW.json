@@ -98,5 +98,21 @@
   "validation.requiredClientPhone": "請輸入客戶電話",
   "validation.requiredSalesPerson": "請輸入銷售負責人",
   "validation.requiredInstaller": "請輸入安裝負責人",
-  "validation.requiredDates": "請選擇施工日期"
+  "validation.requiredDates": "請選擇施工日期",
+
+  "btn.tour": "功能導覽",
+  "tour.mode.title": "介面模式",
+  "tour.mode.desc": "在此切換資料來源：本機或真實後端（測試/生產）。",
+  "tour.lang.title": "語言切換",
+  "tour.lang.desc": "在此切換應用語言。",
+  "tour.search.title": "搜尋",
+  "tour.search.desc": "可按專案、客戶或地址搜尋。",
+  "tour.export.title": "匯出",
+  "tour.export.desc": "將當月安排匯出為 Excel 或 PDF。",
+  "tour.add.title": "新增專案",
+  "tour.add.desc": "從這裡建立一個新專案。",
+  "tour.calendar.title": "行事曆視圖",
+  "tour.calendar.desc": "按月總覽專案，點擊事件可開啟詳情。",
+  "tour.table.title": "專案列表",
+  "tour.table.desc": "表格詳細資訊，點擊列開啟右側抽屜。"
 }

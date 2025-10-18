@@ -11,7 +11,8 @@
 import dayjs from 'dayjs'
 import axios from 'axios'
 import i18n from './i18n'
-import { ENV_DEFAULT_MODE, API_BASE_FALLBACK, API_BASE_PROD, API_BASE_TEST, IS_DEV } from './config'
+import { ENV_DEFAULT_MODE, API_BASE_FALLBACK, API_BASE_PROD, API_BASE_TEST, IS_DEV, ENV_MODE } from './config'
+import { normalizeStatus as normalizeStatusUtil } from './utils/status'
 
 // Env defaults
 const ENV_DEFAULT_MODE_LOCAL = ENV_DEFAULT_MODE
@@ -19,6 +20,7 @@ const API_BASE_FALLBACK_LOCAL = API_BASE_FALLBACK
 const API_BASE_PROD_LOCAL = API_BASE_PROD
 const API_BASE_TEST_LOCAL = API_BASE_TEST
 const isDev = IS_DEV
+const isTestMode = ENV_MODE === 'test'
 
 // Persisted runtime mode
 const LS_MODE_KEY = 'rw_api_mode'
@@ -29,38 +31,69 @@ function normalizeMode(m) { return (m === 'backend' || m === 'backend-dev') ? 'b
 let currentMode = normalizeMode(readMode())
 try { localStorage.setItem(LS_MODE_KEY, currentMode) } catch {}
 
-function resolveAxiosBase(mode) {
+function effectiveMode() {
+  try {
+    const m = localStorage.getItem(LS_MODE_KEY)
+    if (m) return normalizeMode(m)
+  } catch {}
+  return currentMode
+}
+
+function resolveAxiosBase(modeInput) {
+  const mode = modeInput || effectiveMode()
   if (mode === 'local') return ''
-  // Keep using dev proxy for legacy 'backend' mode to support local BE via Vite proxy
-  if (isDev && (mode === 'backend' || mode === 'backend-dev')) return ''
+  // In Playwright test builds or vite preview on test port, force fixed localhost targets to match route intercepts
+  const isPreviewTest = (typeof window !== 'undefined' && window?.location?.port === '4173')
+  if (isTestMode || isPreviewTest) {
+    if (mode === 'backend-test') return 'http://localhost:9005'
+    if (mode === 'backend-prod') return 'http://localhost:9006'
+  }
   if (mode === 'backend-test') return API_BASE_TEST_LOCAL
-  if (mode === 'backend-prod' || mode === 'backend') return API_BASE_PROD_LOCAL
+  if (mode === 'backend-prod') return API_BASE_PROD_LOCAL
+  // Fallback: use prod
   return API_BASE_PROD_LOCAL
 }
 
 // Helper/debug utilities
 function logBases(context) {
   if (!isDev || typeof window === 'undefined') return
-  const resolved = resolveAxiosBase(currentMode) || '(same-origin proxy or local)'
+  const mode = effectiveMode()
+  const resolved = resolveAxiosBase(mode) || '(same-origin proxy or local)'
   // eslint-disable-next-line no-console
-  console.info(`[API] ${context}: mode=${currentMode}, test=${API_BASE_TEST_LOCAL}, prod=${API_BASE_PROD_LOCAL}, resolved=${resolved}`)
+  console.info(`[API] ${context}: mode=${mode}, test=${API_BASE_TEST_LOCAL}, prod=${API_BASE_PROD_LOCAL}, resolved=${resolved}`)
 }
 export function getApiBases() {
-  return { mode: currentMode, test: API_BASE_TEST_LOCAL, prod: API_BASE_PROD_LOCAL, fallback: API_BASE_FALLBACK_LOCAL, resolved: resolveAxiosBase(currentMode) }
+  const mode = effectiveMode()
+  return { mode, test: API_BASE_TEST_LOCAL, prod: API_BASE_PROD_LOCAL, fallback: API_BASE_FALLBACK_LOCAL, resolved: resolveAxiosBase(mode) }
 }
 
-let http = axios.create({ baseURL: resolveAxiosBase(currentMode) })
-logBases('init')
-export function getApiMode() { return currentMode }
-export function getApiBaseUrl() { return resolveAxiosBase(currentMode) }
+let http = null
+function client() {
+  const mode = effectiveMode()
+  const base = resolveAxiosBase(mode)
+  if (!http || http.defaults?.baseURL !== base) {
+    http = axios.create({ baseURL: base })
+    logBases('client:init')
+  }
+  return http
+}
+// Remove eager init log
+export function getApiMode() { return effectiveMode() }
+export function getApiBaseUrl() { return resolveAxiosBase(effectiveMode()) }
 export function setApiMode(mode) {
-  currentMode = mode
-  try { localStorage.setItem(LS_MODE_KEY, mode) } catch {}
-  http = axios.create({ baseURL: resolveAxiosBase(mode) })
+  const m = normalizeMode(mode)
+  currentMode = m
+  try { localStorage.setItem(LS_MODE_KEY, m) } catch {}
+  // Eagerly re-create client with the new base to avoid first-call race
+  try {
+    http = axios.create({ baseURL: resolveAxiosBase(m) })
+  } catch {
+    http = null
+  }
   logBases('setApiMode')
 }
 
-function usingBackend() { return currentMode !== 'local' }
+function usingBackend() { return effectiveMode() !== 'local' }
 
 // Utility: safe parse filename from Content-Disposition
 function filenameFromHeaders(headers, fallback) {
@@ -118,11 +151,7 @@ function inRange(p, start, end) {
 }
 
 function normalizeStatusCode(s) {
-  if (!s) return s
-  if (s === '未开始' || s === 'not_started') return 'not_started'
-  if (s === '施工中' || s === 'in_progress') return 'in_progress'
-  if (s === '完成' || s === 'completed') return 'completed'
-  return s
+  return normalizeStatusUtil(s)
 }
 
 // Map backend <-> frontend field names to keep UI stable (snake_case internally)
@@ -193,7 +222,7 @@ function mapToBackendWithBothKeys(values = {}) {
 async function listProjectsBackend(params = {}) {
   const q = { ...params }
   if (!params?.includeArchived) q.archived = false
-  const { data } = await http.get('/api/projects', { params: q })
+  const { data } = await client().get('/api/projects', { params: q })
   // New BE returns envelope { items, page, pageSize, total }
   let items = []
   let page = Number(params.page) || 1
@@ -214,58 +243,57 @@ async function listProjectsBackend(params = {}) {
   return { items: items.map(p => mapToFrontend(p)), page, pageSize, total }
 }
 async function getProjectBackend(id) {
-  const { data } = await http.get(`/api/projects/${id}`)
+  const { data } = await client().get(`/api/projects/${id}`)
   if (!data) throw new Error('Project not found')
   return mapToFrontend(data)
 }
 async function createProjectBackend(values) {
   const payload = mapToBackendWithBothKeys(values)
-  const { data } = await http.post('/api/projects', payload)
+  const { data } = await client().post('/api/projects', payload)
   return mapToFrontend(data)
 }
 async function updateProjectBackend(id, values) {
   const payload = mapToBackendWithBothKeys(values)
-  const { data } = await http.patch(`/api/projects/${id}`, payload)
+  const { data } = await client().patch(`/api/projects/${id}`, payload)
   return mapToFrontend(data)
 }
 async function archiveProjectBackend(id, archived = true) {
-  // Keep PATCH for compatibility; BE also supports POST /archive
-  const { data } = await http.patch(`/api/projects/${id}`, { archived })
+  const { data } = await client().patch(`/api/projects/${id}`, { archived })
   return mapToFrontend(data)
 }
 async function deleteProjectBackend(id) {
-  await http.delete(`/api/projects/${id}`)
+  await client().delete(`/api/projects/${id}`)
   return true
 }
 async function uploadPhotoBackend(id, file) {
   const fd = new FormData()
   fd.append('file', file)
-  const { data } = await http.post(`/api/projects/${id}/photo`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+  const { data } = await client().post(`/api/projects/${id}/photo`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
   return data
 }
 async function listProjectPhotosBackend(id) {
-  const { data } = await http.get(`/api/projects/${id}/photos`)
+  const { data } = await client().get(`/api/projects/${id}/photos`)
   return Array.isArray(data) ? data : []
 }
 async function deleteProjectPhotoBackend(id, photoId) {
-  await http.delete(`/api/projects/${id}/photos/${photoId}`)
+  await client().delete(`/api/projects/${id}/photos/${photoId}`)
   return true
 }
 async function deleteProjectPhotoByTokenBackend(id, token) {
-  await http.delete(`/api/projects/${id}/photo/${token}`)
+  await client().delete(`/api/projects/${id}/photo/${token}`)
   return true
 }
 async function deleteAllProjectPhotosBackend(id) {
-  await http.delete(`/api/projects/${id}/photos`)
+  await client().delete(`/api/projects/${id}/photos`)
   return true
 }
 async function exportExcelBackend({ start, end, archived, includeArchived }) {
   const name = `施工安排表_${start || ''}_${end || ''}.xlsx`
-  await downloadBlob(() => http.get('/api/export/excel', { params: { start, end, archived, includeArchived }, responseType: 'blob' }), name)
+  await downloadBlob(() => client().get('/api/export/excel', { params: { start, end, archived, includeArchived }, responseType: 'blob' }), name)
 }
 async function exportPDFBackend({ start, end, archived, includeArchived }) {
   const name = `施工安排表_${start || ''}_${end || ''}.pdf`
-  await downloadBlob(() => http.get('/api/export/pdf', { params: { start, end, archived, includeArchived }, responseType: 'blob' }), name)
+  await downloadBlob(() => client().get('/api/export/pdf', { params: { start, end, archived, includeArchived }, responseType: 'blob' }), name)
 }
 
 // ---------------- Public API (switches by runtime mode) ----------------
@@ -275,8 +303,11 @@ export async function listProjects(params = {}) {
   const includeArchived = !!params?.includeArchived
   const archivedFlag = params?.archived
   const filtered = list
-    // includeArchived=true => only archived
-    .filter(p => includeArchived ? p.archived === true : (archivedFlag === true ? p.archived === true : p.archived !== true))
+    // Archived handling:
+    // - archived=true => only archived
+    // - includeArchived=true => include both archived and active (no filter)
+    // - default => exclude archived
+    .filter(p => (archivedFlag === true) ? p.archived === true : (includeArchived ? true : p.archived !== true))
     .filter(p => matchQuery(p, params.q))
     .filter(p => matchStatus(p, params.status))
     .filter(p => inRange(p, params.start, params.end))

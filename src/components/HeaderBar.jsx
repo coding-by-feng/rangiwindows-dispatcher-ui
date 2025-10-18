@@ -1,11 +1,11 @@
 import React from 'react'
 import { Button, Input, Space, Typography, Select, Switch } from 'antd'
-import { FileExcelOutlined, FilePdfOutlined, PlusOutlined, DownOutlined, UpOutlined } from '@ant-design/icons'
+import { FileExcelOutlined, FilePdfOutlined, PlusOutlined, DownOutlined, UpOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 
 const { Title } = Typography
 
-export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF, status, onStatusChange, includeArchived = false, onToggleIncludeArchived, mode, onModeChange, onSeedDemo, lang, onLangChange, exportExcelLoading = false, exportPDFLoading = false }) {
+export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF, status, onStatusChange, includeArchived = false, onToggleIncludeArchived, mode, onModeChange, onSeedDemo, lang, onLangChange, exportExcelLoading = false, exportPDFLoading = false, onStartTour }) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = React.useState(true)
 
@@ -24,6 +24,7 @@ export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF,
           className="w-40 sm:w-44"
           value={mode}
           onChange={onModeChange}
+          data-tour-id="mode-select"
           options={[
             { label: t('mode.local'), value: 'local' },
             { label: t('mode.backendTest'), value: 'backend-test' },
@@ -34,6 +35,7 @@ export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF,
           className="w-36 sm:w-40"
           value={lang}
           onChange={onLangChange}
+          data-tour-id="lang-select"
           options={[
             { label: t('lang.zh-CN'), value: 'zh-CN' },
             { label: t('lang.en'), value: 'en' },
@@ -42,20 +44,21 @@ export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF,
         />
 
         {/* Search + Filters */}
-        <Input.Search allowClear placeholder={t('search.placeholder')} onSearch={onSearch} className="w-full sm:w-80" />
+        <Input.Search allowClear placeholder={t('search.placeholder')} onSearch={onSearch} className="w-full sm:w-80" data-tour-id="search-input" />
         <Select
           allowClear
           placeholder={t('filter.status')}
           className="w-full sm:w-32"
           value={status}
           onChange={onStatusChange}
+          data-tour-id="status-filter"
           options={[
             { label: t('status.not_started'), value: 'not_started' },
             { label: t('status.in_progress'), value: 'in_progress' },
             { label: t('status.completed'), value: 'completed' },
           ]}
         />
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1" data-tour-id="archived-toggle">
           <Switch size="small" checked={includeArchived} onChange={onToggleIncludeArchived} />
           <span className="text-xs text-slate-600">{t('label.showArchived')}</span>
         </div>
@@ -64,8 +67,8 @@ export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF,
         <Space wrap size={[8, 8]}>
           {expanded && (
             <>
-              <Button icon={<FileExcelOutlined />} onClick={onExportExcel} loading={exportExcelLoading}>{t('btn.exportExcel')}</Button>
-              <Button icon={<FilePdfOutlined />} onClick={onExportPDF} loading={exportPDFLoading}>{t('btn.exportPDF')}</Button>
+              <Button icon={<FileExcelOutlined />} onClick={onExportExcel} loading={exportExcelLoading} data-tour-id="export-excel">{t('btn.exportExcel')}</Button>
+              <Button icon={<FilePdfOutlined />} onClick={onExportPDF} loading={exportPDFLoading} data-tour-id="export-pdf">{t('btn.exportPDF')}</Button>
               {mode === 'local' && (
                 <Button onClick={onSeedDemo}>{t('btn.seedAkl')}</Button>
               )}
@@ -74,7 +77,8 @@ export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF,
           <Button onClick={() => setExpanded(e => !e)} icon={expanded ? <UpOutlined /> : <DownOutlined />}>
             {expanded ? t('btn.collapse') : t('btn.more')}
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>{t('btn.addProject')}</Button>
+          <Button icon={<QuestionCircleOutlined />} onClick={onStartTour}>{t('btn.tour')}</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={onAdd} data-tour-id="add-project">{t('btn.addProject')}</Button>
         </Space>
       </div>
     </div>
