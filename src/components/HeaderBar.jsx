@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 const { Title } = Typography
 
-export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF, status, onStatusChange, includeArchived = false, onToggleIncludeArchived, mode, onModeChange, onSeedDemo, lang, onLangChange, exportExcelLoading = false, exportPDFLoading = false, onStartTour }) {
+export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF, status, onStatusChange, includeArchived = false, onToggleIncludeArchived, mode, onModeChange, onSeedDemo, lang, onLangChange, exportExcelLoading = false, exportPDFLoading = false, onStartTour, seedLoading = false }) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = React.useState(true)
 
@@ -70,14 +70,14 @@ export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF,
               <Button icon={<FileExcelOutlined />} onClick={onExportExcel} loading={exportExcelLoading} data-tour-id="export-excel">{t('btn.exportExcel')}</Button>
               <Button icon={<FilePdfOutlined />} onClick={onExportPDF} loading={exportPDFLoading} data-tour-id="export-pdf">{t('btn.exportPDF')}</Button>
               {mode === 'local' && (
-                <Button onClick={onSeedDemo}>{t('btn.seedAkl')}</Button>
+                <Button onClick={onSeedDemo} loading={seedLoading} data-tour-id="seed-demo">{t('btn.seedAkl')}</Button>
               )}
             </>
           )}
-          <Button onClick={() => setExpanded(e => !e)} icon={expanded ? <UpOutlined /> : <DownOutlined />}>
+          <Button onClick={() => setExpanded(e => !e)} icon={expanded ? <UpOutlined /> : <DownOutlined />} data-tour-id="more-toggle">
             {expanded ? t('btn.collapse') : t('btn.more')}
           </Button>
-          <Button icon={<QuestionCircleOutlined />} onClick={onStartTour}>{t('btn.tour')}</Button>
+          <Button icon={<QuestionCircleOutlined />} onClick={onStartTour} data-tour-id="start-tour">{t('btn.tour')}</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={onAdd} data-tour-id="add-project">{t('btn.addProject')}</Button>
         </Space>
       </div>

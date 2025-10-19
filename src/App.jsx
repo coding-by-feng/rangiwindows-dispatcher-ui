@@ -37,6 +37,8 @@ function AppContent() {
   const [exportExcelLoading, setExportExcelLoading] = React.useState(false)
   const [exportPDFLoading, setExportPDFLoading] = React.useState(false)
   const [tourOpen, setTourOpen] = React.useState(false)
+  const [projectLoading, setProjectLoading] = React.useState(false)
+  const [seedLoading, setSeedLoading] = React.useState(false)
 
   // Normalize legacy modes to show in UI as backend-test
   const toDisplayMode = React.useCallback((m) => (m === 'backend' || m === 'backend-dev') ? 'backend-test' : m, [])
@@ -112,21 +114,30 @@ function AppContent() {
 
   const onOpenProject = async (id) => {
     setSelectedId(id)
+    setSelectedProject(null)
+    setSelectedPhotos([])
+    setProjectLoading(true)
+    const key = 'loading-project'
+    message.open({ type: 'loading', content: t('loading.fetching'), key })
     try {
       const p = await getProject(id)
       setSelectedProject(p)
+      try {
+        const photos = await listProjectPhotos(id)
+        setSelectedPhotos(Array.isArray(photos) ? photos : [])
+      } catch (e) {
+        const msg = e?.response?.data?.message || e?.message || 'Request failed'
+        message.error(t('err.fetchPhotosFailed', { msg }))
+        setSelectedPhotos([])
+      }
     } catch (e) {
       const msg = e?.response?.data?.message || e?.message || 'Request failed'
       message.error(t('err.fetchProjectFailed', { msg }))
-      return
-    }
-    try {
-      const photos = await listProjectPhotos(id)
-      setSelectedPhotos(Array.isArray(photos) ? photos : [])
-    } catch (e) {
-      const msg = e?.response?.data?.message || e?.message || 'Request failed'
-      message.error(t('err.fetchPhotosFailed', { msg }))
-      setSelectedPhotos([])
+      // Auto-close drawer if failed
+      setSelectedId(null)
+    } finally {
+      setProjectLoading(false)
+      message.destroy(key)
     }
   }
 
@@ -271,10 +282,15 @@ function AppContent() {
 
   const onSeedDemo = async () => {
     if (mode !== 'local') return
-    const created = await seedAucklandDemos(10)
-    await fetchData()
-    if (created > 0) message.success(t('toast.seedCreated', { count: created }))
-    else message.info(t('toast.seedEnough'))
+    setSeedLoading(true)
+    try {
+      const created = await seedAucklandDemos(10)
+      await fetchData()
+      if (created > 0) message.success(t('toast.seedCreated', { count: created }))
+      else message.info(t('toast.seedEnough'))
+    } finally {
+      setSeedLoading(false)
+    }
   }
 
   const onLangChange = (lng) => {
@@ -283,48 +299,73 @@ function AppContent() {
   }
 
   const qs = React.useCallback((selector) => document.querySelector(selector), [])
-  const tourSteps = React.useMemo(() => [
-    {
-      title: t('tour.mode.title'),
-      description: t('tour.mode.desc'),
-      target: () => qs('[data-tour-id="mode-select"]'),
-      placement: 'bottom'
-    },
-    {
-      title: t('tour.lang.title'),
-      description: t('tour.lang.desc'),
-      target: () => qs('[data-tour-id="lang-select"]'),
-      placement: 'bottom'
-    },
-    {
-      title: t('tour.search.title'),
-      description: t('tour.search.desc'),
-      target: () => qs('[data-tour-id="search-input"]'),
-      placement: 'bottom'
-    },
-    {
-      title: t('tour.export.title'),
-      description: t('tour.export.desc'),
-      target: () => qs('[data-tour-id="export-excel"]') || qs('[data-tour-id="export-pdf"]'),
-      placement: 'bottom'
-    },
-    {
-      title: t('tour.add.title'),
-      description: t('tour.add.desc'),
-      target: () => qs('[data-tour-id="add-project"]'),
-      placement: 'bottom'
-    },
-    {
-      title: t('tour.calendar.title'),
-      description: t('tour.calendar.desc'),
-      target: () => qs('[data-tour-id="calendar-view"]')
-    },
-    {
-      title: t('tour.table.title'),
-      description: t('tour.table.desc'),
-      target: () => qs('[data-tour-id="project-table"]')
+
+  // Helper: ensure a project drawer is open for drawer-related steps
+  const ensureProjectOpen = React.useCallback(async () => {
+    if (!selectedProject) {
+      const first = projects?.[0]
+      if (first?.id) {
+        try { await onOpenProject(first.id) } catch {}
+      }
     }
+  }, [selectedProject, projects])
+
+  const tourSteps = React.useMemo(() => [
+    // Header controls
+    { title: t('tour.mode.title'), description: t('tour.mode.desc'), target: () => qs('[data-tour-id="mode-select"]'), placement: 'bottom' },
+    { title: t('tour.lang.title'), description: t('tour.lang.desc'), target: () => qs('[data-tour-id="lang-select"]'), placement: 'bottom' },
+    { title: t('tour.search.title'), description: t('tour.search.desc'), target: () => qs('[data-tour-id="search-input"]'), placement: 'bottom' },
+    { title: t('tour.statusFilter.title'), description: t('tour.statusFilter.desc'), target: () => qs('[data-tour-id="status-filter"]'), placement: 'bottom' },
+    { title: t('tour.archived.title'), description: t('tour.archived.desc'), target: () => qs('[data-tour-id="archived-toggle"]'), placement: 'bottom' },
+    { title: t('tour.exportExcel.title'), description: t('tour.exportExcel.desc'), target: () => qs('[data-tour-id="export-excel"]'), placement: 'bottom' },
+    { title: t('tour.exportPDF.title'), description: t('tour.exportPDF.desc'), target: () => qs('[data-tour-id="export-pdf"]'), placement: 'bottom' },
+    { title: t('tour.seed.title'), description: t('tour.seed.desc'), target: () => qs('[data-tour-id="seed-demo"]') || qs('[data-tour-id="more-toggle"]') },
+    { title: t('tour.more.title'), description: t('tour.more.desc'), target: () => qs('[data-tour-id="more-toggle"]'), placement: 'bottom' },
+    { title: t('tour.add.title'), description: t('tour.add.desc'), target: () => qs('[data-tour-id="add-project"]'), placement: 'bottom' },
+
+    // Create modal fields
+    { title: t('tour.pff.name.title'), description: t('tour.pff.name.desc'), target: () => qs('[data-tour-id="pff-name"]') },
+    { title: t('tour.pff.address.title'), description: t('tour.pff.address.desc'), target: () => qs('[data-tour-id="pff-address"]') },
+    { title: t('tour.pff.clientName.title'), description: t('tour.pff.clientName.desc'), target: () => qs('[data-tour-id="pff-client-name"]') },
+    { title: t('tour.pff.clientPhone.title'), description: t('tour.pff.clientPhone.desc'), target: () => qs('[data-tour-id="pff-client-phone"]') },
+    { title: t('tour.pff.sales.title'), description: t('tour.pff.sales.desc'), target: () => qs('[data-tour-id="pff-sales-person"]') },
+    { title: t('tour.pff.installer.title'), description: t('tour.pff.installer.desc'), target: () => qs('[data-tour-id="pff-installer"]') },
+    { title: t('tour.pff.team.title'), description: t('tour.pff.team.desc'), target: () => qs('[data-tour-id="pff-team-members"]') },
+    { title: t('tour.pff.dates.title'), description: t('tour.pff.dates.desc'), target: () => qs('[data-tour-id="pff-dates"]') },
+    { title: t('tour.pff.status.title'), description: t('tour.pff.status.desc'), target: () => qs('[data-tour-id="pff-status"]') },
+    { title: t('tour.pff.today.title'), description: t('tour.pff.today.desc'), target: () => qs('[data-tour-id="pff-today-task"]') },
+    { title: t('tour.pff.note.title'), description: t('tour.pff.note.desc'), target: () => qs('[data-tour-id="pff-progress-note"]') },
+    { title: t('tour.create.ok.title'), description: t('tour.create.ok.desc'), target: () => qs('[data-tour-id="create-ok"]') },
+    { title: t('tour.create.cancel.title'), description: t('tour.create.cancel.desc'), target: () => qs('[data-tour-id="create-cancel"]') },
+
+    // Calendar and table
+    { title: t('tour.calendar.title'), description: t('tour.calendar.desc'), target: () => qs('[data-tour-id="calendar-view"]') },
+    { title: t('tour.table.title'), description: t('tour.table.desc'), target: () => qs('[data-tour-id="project-table"]') },
+
+    // Drawer quick update and actions
+    { title: t('tour.drawer.status.title'), description: t('tour.drawer.status.desc'), target: () => qs('[data-tour-id="drawer-status"]') },
+    { title: t('tour.drawer.today.title'), description: t('tour.drawer.today.desc'), target: () => qs('[data-tour-id="drawer-today-task"]') },
+    { title: t('tour.drawer.note.title'), description: t('tour.drawer.note.desc'), target: () => qs('[data-tour-id="drawer-progress-note"]') },
+    { title: t('tour.drawer.save.title'), description: t('tour.drawer.save.desc'), target: () => qs('[data-tour-id="drawer-save"]') },
+    { title: t('tour.drawer.edit.title'), description: t('tour.drawer.edit.desc'), target: () => qs('[data-tour-id="drawer-edit"]') },
+    { title: t('tour.drawer.cancelEdit.title'), description: t('tour.drawer.cancelEdit.desc'), target: () => qs('[data-tour-id="drawer-cancel-edit"]') },
+    { title: t('tour.drawer.archive.title'), description: t('tour.drawer.archive.desc'), target: () => qs('[data-tour-id="drawer-archive"]') },
+    { title: t('tour.drawer.delete.title'), description: t('tour.drawer.delete.desc'), target: () => qs('[data-tour-id="drawer-delete"]') },
+    { title: t('tour.drawer.upload.title'), description: t('tour.drawer.upload.desc'), target: () => qs('[data-tour-id="drawer-upload"]') },
+    { title: t('tour.drawer.close.title'), description: t('tour.drawer.close.desc'), target: () => qs('[data-tour-id="drawer-close"]') },
   ], [t, qs])
+
+  // Drive UI to show the right surface for certain steps
+  const onTourChange = React.useCallback(async (current) => {
+    // Steps 10-22 are in the Create modal
+    if (current >= 10 && current <= 22) {
+      setCreateOpen(true)
+    }
+    // Steps 25-34 are in the Drawer
+    if (current >= 25 && current <= 34) {
+      await ensureProjectOpen()
+    }
+  }, [ensureProjectOpen])
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -333,8 +374,6 @@ function AppContent() {
         onAdd={() => setCreateOpen(true)}
         onExportExcel={() => onExport('excel')}
         onExportPDF={() => onExport('pdf')}
-        exportExcelLoading={exportExcelLoading}
-        exportPDFLoading={exportPDFLoading}
         status={status}
         onStatusChange={setStatus}
         includeArchived={includeArchived}
@@ -345,6 +384,9 @@ function AppContent() {
         lang={lang}
         onLangChange={onLangChange}
         onStartTour={() => setTourOpen(true)}
+        exportExcelLoading={exportExcelLoading}
+        exportPDFLoading={exportPDFLoading}
+        seedLoading={seedLoading}
       />
 
       <div className="container mx-auto p-3 sm:p-4 flex flex-col gap-4">
@@ -362,10 +404,10 @@ function AppContent() {
       </div>
 
       <ProjectDrawer
-        open={!!selectedProject}
+        open={selectedId != null}
         project={selectedProject}
         photos={selectedPhotos}
-        onClose={() => setSelectedProject(null)}
+        onClose={() => { setSelectedProject(null); setSelectedId(null); setSelectedPhotos([]); setProjectLoading(false) }}
         onSave={onSaveProject}
         onUpload={onUploadPhoto}
         onDeletePhoto={onDeletePhoto}
@@ -376,6 +418,7 @@ function AppContent() {
         archiving={archiveLoading}
         deleting={deleteLoading}
         uploading={uploadLoading}
+        loading={projectLoading}
       />
 
       <CreateProjectModal
@@ -385,7 +428,7 @@ function AppContent() {
         confirmLoading={createLoading}
       />
 
-      <Tour open={tourOpen} onClose={() => setTourOpen(false)} steps={tourSteps} mask closable />
+      <Tour open={tourOpen} onClose={() => setTourOpen(false)} steps={tourSteps} mask closable onChange={onTourChange} />
     </div>
   )
 }

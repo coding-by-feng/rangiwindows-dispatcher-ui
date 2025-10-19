@@ -1,0 +1,31 @@
+# Dependencies and build outputs
+node_modules
+.dist
+/dist
+
+# VCS and IDE
+.git
+.gitignore
+.idea
+.vscode
+.DS_Store
+
+# Tests and reports
+playwright.config.ts
+tests
+/test-results
+coverage
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env files (keep example)
+.env*
+!.env.example
+
+# Misc
+docs
+
