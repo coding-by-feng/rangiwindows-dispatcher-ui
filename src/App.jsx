@@ -6,7 +6,7 @@ import CalendarView from './components/CalendarView'
 import ProjectTable from './components/ProjectTable'
 import ProjectDrawer from './components/ProjectDrawer'
 import CreateProjectModal from './components/CreateProjectModal'
-import { listProjects, createProject, updateProject, uploadPhoto, exportExcel, exportPDF, getProject, archiveProject, deleteProject, getApiMode, setApiMode, seedAucklandDemos, listProjectPhotos, deleteProjectPhoto, deleteAllProjectPhotos } from './api'
+import { listProjects, createProject, updateProject, uploadPhoto, exportExcel, getProject, archiveProject, deleteProject, getApiMode, setApiMode, seedAucklandDemos, listProjectPhotos, deleteProjectPhoto, deleteAllProjectPhotos } from './api'
 import { useTranslation } from 'react-i18next'
 import { setAppLanguage, getAppLanguage } from './i18n'
 import zhCN from 'antd/es/locale/zh_CN'
@@ -35,7 +35,6 @@ function AppContent() {
   const [deleteLoading, setDeleteLoading] = React.useState(false)
   const [uploadLoading, setUploadLoading] = React.useState(false)
   const [exportExcelLoading, setExportExcelLoading] = React.useState(false)
-  const [exportPDFLoading, setExportPDFLoading] = React.useState(false)
   const [tourOpen, setTourOpen] = React.useState(false)
   const [projectLoading, setProjectLoading] = React.useState(false)
   const [seedLoading, setSeedLoading] = React.useState(false)
@@ -89,22 +88,23 @@ function AppContent() {
   React.useEffect(() => { setPage(1) }, [q, status, includeArchived])
 
   const onExport = (type) => {
+    if (type !== 'excel') return // Only allow Excel export now
     const start = dayjs().startOf('month').format('YYYY-MM-DD')
     const end = dayjs().endOf('month').format('YYYY-MM-DD')
     const key = `export-${type}`
-    if (type === 'excel') setExportExcelLoading(true)
-    else setExportPDFLoading(true)
+    setExportExcelLoading(true)
     message.open({ type: 'loading', content: t('loading.exporting'), key })
-    const p = type === 'excel' ? exportExcel({ start, end, includeArchived }) : exportPDF({ start, end, includeArchived })
-    p.then(() => {
-      message.open({ type: 'success', content: type === 'excel' ? t('btn.exportExcel') + ' OK' : t('btn.exportPDF') + ' OK', key, duration: 2 })
-    }).catch((e) => {
-      const msg = e?.response?.data?.message || e?.message || 'Request failed'
-      message.open({ type: 'error', content: t('err.exportFailed', { msg }), key, duration: 3 })
-    }).finally(() => {
-      if (type === 'excel') setExportExcelLoading(false)
-      else setExportPDFLoading(false)
-    })
+    exportExcel({ start, end, includeArchived })
+      .then(() => {
+        message.open({ type: 'success', content: t('btn.exportExcel') + ' OK', key, duration: 2 })
+      })
+      .catch((e) => {
+        const msg = e?.response?.data?.message || e?.message || 'Request failed'
+        message.open({ type: 'error', content: t('err.exportFailed', { msg }), key, duration: 3 })
+      })
+      .finally(() => {
+        setExportExcelLoading(false)
+      })
   }
 
   const onPageChange = (p, ps) => {
@@ -310,50 +310,51 @@ function AppContent() {
     }
   }, [selectedProject, projects])
 
-  const tourSteps = React.useMemo(() => [
-    // Header controls
-    { title: t('tour.mode.title'), description: t('tour.mode.desc'), target: () => qs('[data-tour-id="mode-select"]'), placement: 'bottom' },
-    { title: t('tour.lang.title'), description: t('tour.lang.desc'), target: () => qs('[data-tour-id="lang-select"]'), placement: 'bottom' },
-    { title: t('tour.search.title'), description: t('tour.search.desc'), target: () => qs('[data-tour-id="search-input"]'), placement: 'bottom' },
-    { title: t('tour.statusFilter.title'), description: t('tour.statusFilter.desc'), target: () => qs('[data-tour-id="status-filter"]'), placement: 'bottom' },
-    { title: t('tour.archived.title'), description: t('tour.archived.desc'), target: () => qs('[data-tour-id="archived-toggle"]'), placement: 'bottom' },
-    { title: t('tour.exportExcel.title'), description: t('tour.exportExcel.desc'), target: () => qs('[data-tour-id="export-excel"]'), placement: 'bottom' },
-    { title: t('tour.exportPDF.title'), description: t('tour.exportPDF.desc'), target: () => qs('[data-tour-id="export-pdf"]'), placement: 'bottom' },
-    { title: t('tour.seed.title'), description: t('tour.seed.desc'), target: () => qs('[data-tour-id="seed-demo"]') || qs('[data-tour-id="more-toggle"]') },
-    { title: t('tour.more.title'), description: t('tour.more.desc'), target: () => qs('[data-tour-id="more-toggle"]'), placement: 'bottom' },
-    { title: t('tour.add.title'), description: t('tour.add.desc'), target: () => qs('[data-tour-id="add-project"]'), placement: 'bottom' },
-
-    // Create modal fields
-    { title: t('tour.pff.name.title'), description: t('tour.pff.name.desc'), target: () => qs('[data-tour-id="pff-name"]') },
-    { title: t('tour.pff.address.title'), description: t('tour.pff.address.desc'), target: () => qs('[data-tour-id="pff-address"]') },
-    { title: t('tour.pff.clientName.title'), description: t('tour.pff.clientName.desc'), target: () => qs('[data-tour-id="pff-client-name"]') },
-    { title: t('tour.pff.clientPhone.title'), description: t('tour.pff.clientPhone.desc'), target: () => qs('[data-tour-id="pff-client-phone"]') },
-    { title: t('tour.pff.sales.title'), description: t('tour.pff.sales.desc'), target: () => qs('[data-tour-id="pff-sales-person"]') },
-    { title: t('tour.pff.installer.title'), description: t('tour.pff.installer.desc'), target: () => qs('[data-tour-id="pff-installer"]') },
-    { title: t('tour.pff.team.title'), description: t('tour.pff.team.desc'), target: () => qs('[data-tour-id="pff-team-members"]') },
-    { title: t('tour.pff.dates.title'), description: t('tour.pff.dates.desc'), target: () => qs('[data-tour-id="pff-dates"]') },
-    { title: t('tour.pff.status.title'), description: t('tour.pff.status.desc'), target: () => qs('[data-tour-id="pff-status"]') },
-    { title: t('tour.pff.today.title'), description: t('tour.pff.today.desc'), target: () => qs('[data-tour-id="pff-today-task"]') },
-    { title: t('tour.pff.note.title'), description: t('tour.pff.note.desc'), target: () => qs('[data-tour-id="pff-progress-note"]') },
-    { title: t('tour.create.ok.title'), description: t('tour.create.ok.desc'), target: () => qs('[data-tour-id="create-ok"]') },
-    { title: t('tour.create.cancel.title'), description: t('tour.create.cancel.desc'), target: () => qs('[data-tour-id="create-cancel"]') },
-
-    // Calendar and table
-    { title: t('tour.calendar.title'), description: t('tour.calendar.desc'), target: () => qs('[data-tour-id="calendar-view"]') },
-    { title: t('tour.table.title'), description: t('tour.table.desc'), target: () => qs('[data-tour-id="project-table"]') },
-
-    // Drawer quick update and actions
-    { title: t('tour.drawer.status.title'), description: t('tour.drawer.status.desc'), target: () => qs('[data-tour-id="drawer-status"]') },
-    { title: t('tour.drawer.today.title'), description: t('tour.drawer.today.desc'), target: () => qs('[data-tour-id="drawer-today-task"]') },
-    { title: t('tour.drawer.note.title'), description: t('tour.drawer.note.desc'), target: () => qs('[data-tour-id="drawer-progress-note"]') },
-    { title: t('tour.drawer.save.title'), description: t('tour.drawer.save.desc'), target: () => qs('[data-tour-id="drawer-save"]') },
-    { title: t('tour.drawer.edit.title'), description: t('tour.drawer.edit.desc'), target: () => qs('[data-tour-id="drawer-edit"]') },
-    { title: t('tour.drawer.cancelEdit.title'), description: t('tour.drawer.cancelEdit.desc'), target: () => qs('[data-tour-id="drawer-cancel-edit"]') },
-    { title: t('tour.drawer.archive.title'), description: t('tour.drawer.archive.desc'), target: () => qs('[data-tour-id="drawer-archive"]') },
-    { title: t('tour.drawer.delete.title'), description: t('tour.drawer.delete.desc'), target: () => qs('[data-tour-id="drawer-delete"]') },
-    { title: t('tour.drawer.upload.title'), description: t('tour.drawer.upload.desc'), target: () => qs('[data-tour-id="drawer-upload"]') },
-    { title: t('tour.drawer.close.title'), description: t('tour.drawer.close.desc'), target: () => qs('[data-tour-id="drawer-close"]') },
-  ], [t, qs])
+  const tourSteps = React.useMemo(() => {
+    const steps = [
+      { title: t('tour.mode.title'), description: t('tour.mode.desc'), target: () => qs('[data-tour-id="mode-select"]'), placement: 'bottom' },
+      { title: t('tour.lang.title'), description: t('tour.lang.desc'), target: () => qs('[data-tour-id="lang-select"]'), placement: 'bottom' },
+      { title: t('tour.search.title'), description: t('tour.search.desc'), target: () => qs('[data-tour-id="search-input"]'), placement: 'bottom' },
+      { title: t('tour.statusFilter.title'), description: t('tour.statusFilter.desc'), target: () => qs('[data-tour-id="status-filter"]'), placement: 'bottom' },
+      { title: t('tour.archived.title'), description: t('tour.archived.desc'), target: () => qs('[data-tour-id="archived-toggle"]'), placement: 'bottom' },
+      { title: t('tour.exportExcel.title'), description: t('tour.exportExcel.desc'), target: () => qs('[data-tour-id="export-excel"]'), placement: 'bottom' },
+      // Only show the seed demo step in local mode
+      ...(mode === 'local' ? [
+        { title: t('tour.seed.title'), description: t('tour.seed.desc'), target: () => qs('[data-tour-id="seed-demo"]') || qs('[data-tour-id="more-toggle"]') },
+      ] : []),
+      { title: t('tour.more.title'), description: t('tour.more.desc'), target: () => qs('[data-tour-id="more-toggle"]'), placement: 'bottom' },
+      { title: t('tour.add.title'), description: t('tour.add.desc'), target: () => qs('[data-tour-id="add-project"]'), placement: 'bottom' },
+    ]
+    // Add the rest of the steps (create modal, calendar, table, drawer) as before
+    return [
+      ...steps,
+      { title: t('tour.pff.name.title'), description: t('tour.pff.name.desc'), target: () => qs('[data-tour-id="pff-name"]') },
+      { title: t('tour.pff.address.title'), description: t('tour.pff.address.desc'), target: () => qs('[data-tour-id="pff-address"]') },
+      { title: t('tour.pff.clientName.title'), description: t('tour.pff.clientName.desc'), target: () => qs('[data-tour-id="pff-client-name"]') },
+      { title: t('tour.pff.clientPhone.title'), description: t('tour.pff.clientPhone.desc'), target: () => qs('[data-tour-id="pff-client-phone"]') },
+      { title: t('tour.pff.sales.title'), description: t('tour.pff.sales.desc'), target: () => qs('[data-tour-id="pff-sales-person"]') },
+      { title: t('tour.pff.installer.title'), description: t('tour.pff.installer.desc'), target: () => qs('[data-tour-id="pff-installer"]') },
+      { title: t('tour.pff.team.title'), description: t('tour.pff.team.desc'), target: () => qs('[data-tour-id="pff-team-members"]') },
+      { title: t('tour.pff.dates.title'), description: t('tour.pff.dates.desc'), target: () => qs('[data-tour-id="pff-dates"]') },
+      { title: t('tour.pff.status.title'), description: t('tour.pff.status.desc'), target: () => qs('[data-tour-id="pff-status"]') },
+      { title: t('tour.pff.today.title'), description: t('tour.pff.today.desc'), target: () => qs('[data-tour-id="pff-today-task"]') },
+      { title: t('tour.pff.note.title'), description: t('tour.pff.note.desc'), target: () => qs('[data-tour-id="pff-progress-note"]') },
+      { title: t('tour.create.ok.title'), description: t('tour.create.ok.desc'), target: () => qs('[data-tour-id="create-ok"]') },
+      { title: t('tour.create.cancel.title'), description: t('tour.create.cancel.desc'), target: () => qs('[data-tour-id="create-cancel"]') },
+      { title: t('tour.calendar.title'), description: t('tour.calendar.desc'), target: () => qs('[data-tour-id="calendar-view"]') },
+      { title: t('tour.table.title'), description: t('tour.table.desc'), target: () => qs('[data-tour-id="project-table"]') },
+      { title: t('tour.drawer.status.title'), description: t('tour.drawer.status.desc'), target: () => qs('[data-tour-id="drawer-status"]') },
+      { title: t('tour.drawer.today.title'), description: t('tour.drawer.today.desc'), target: () => qs('[data-tour-id="drawer-today-task"]') },
+      { title: t('tour.drawer.note.title'), description: t('tour.drawer.note.desc'), target: () => qs('[data-tour-id="drawer-progress-note"]') },
+      { title: t('tour.drawer.save.title'), description: t('tour.drawer.save.desc'), target: () => qs('[data-tour-id="drawer-save"]') },
+      { title: t('tour.drawer.edit.title'), description: t('tour.drawer.edit.desc'), target: () => qs('[data-tour-id="drawer-edit"]') },
+      { title: t('tour.drawer.cancelEdit.title'), description: t('tour.drawer.cancelEdit.desc'), target: () => qs('[data-tour-id="drawer-cancel-edit"]') },
+      { title: t('tour.drawer.archive.title'), description: t('tour.drawer.archive.desc'), target: () => qs('[data-tour-id="drawer-archive"]') },
+      { title: t('tour.drawer.delete.title'), description: t('tour.drawer.delete.desc'), target: () => qs('[data-tour-id="drawer-delete"]') },
+      { title: t('tour.drawer.upload.title'), description: t('tour.drawer.upload.desc'), target: () => qs('[data-tour-id="drawer-upload"]') },
+      { title: t('tour.drawer.close.title'), description: t('tour.drawer.close.desc'), target: () => qs('[data-tour-id="drawer-close"]') },
+    ]
+  }, [t, qs, mode])
 
   // Drive UI to show the right surface for certain steps
   const onTourChange = React.useCallback(async (current) => {
@@ -373,7 +374,6 @@ function AppContent() {
         onSearch={setQ}
         onAdd={() => setCreateOpen(true)}
         onExportExcel={() => onExport('excel')}
-        onExportPDF={() => onExport('pdf')}
         status={status}
         onStatusChange={setStatus}
         includeArchived={includeArchived}
@@ -385,7 +385,6 @@ function AppContent() {
         onLangChange={onLangChange}
         onStartTour={() => setTourOpen(true)}
         exportExcelLoading={exportExcelLoading}
-        exportPDFLoading={exportPDFLoading}
         seedLoading={seedLoading}
       />
 

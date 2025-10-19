@@ -1,11 +1,11 @@
 import React from 'react'
 import { Button, Input, Space, Typography, Select, Switch } from 'antd'
-import { FileExcelOutlined, FilePdfOutlined, PlusOutlined, DownOutlined, UpOutlined, QuestionCircleOutlined } from '@ant-design/icons'
+import { FileExcelOutlined, PlusOutlined, DownOutlined, UpOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 
 const { Title } = Typography
 
-export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF, status, onStatusChange, includeArchived = false, onToggleIncludeArchived, mode, onModeChange, onSeedDemo, lang, onLangChange, exportExcelLoading = false, exportPDFLoading = false, onStartTour, seedLoading = false }) {
+export default function HeaderBar({ onSearch, onAdd, onExportExcel, status, onStatusChange, includeArchived = false, onToggleIncludeArchived, mode, onModeChange, onSeedDemo, lang, onLangChange, exportExcelLoading = false, onStartTour, seedLoading = false }) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = React.useState(true)
 
@@ -68,7 +68,6 @@ export default function HeaderBar({ onSearch, onAdd, onExportExcel, onExportPDF,
           {expanded && (
             <>
               <Button icon={<FileExcelOutlined />} onClick={onExportExcel} loading={exportExcelLoading} data-tour-id="export-excel">{t('btn.exportExcel')}</Button>
-              <Button icon={<FilePdfOutlined />} onClick={onExportPDF} loading={exportPDFLoading} data-tour-id="export-pdf">{t('btn.exportPDF')}</Button>
               {mode === 'local' && (
                 <Button onClick={onSeedDemo} loading={seedLoading} data-tour-id="seed-demo">{t('btn.seedAkl')}</Button>
               )}

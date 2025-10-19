@@ -291,10 +291,6 @@ async function exportExcelBackend({ start, end, archived, includeArchived }) {
   const name = `施工安排表_${start || ''}_${end || ''}.xlsx`
   await downloadBlob(() => client().get('/api/export/excel', { params: { start, end, archived, includeArchived }, responseType: 'blob' }), name)
 }
-async function exportPDFBackend({ start, end, archived, includeArchived }) {
-  const name = `施工安排表_${start || ''}_${end || ''}.pdf`
-  await downloadBlob(() => client().get('/api/export/pdf', { params: { start, end, archived, includeArchived }, responseType: 'blob' }), name)
-}
 
 // ---------------- Public API (switches by runtime mode) ----------------
 export async function listProjects(params = {}) {
@@ -464,37 +460,6 @@ export async function exportExcel({ start, end, archived, includeArchived }) {
   const wb = utils.book_new(); const ws = utils.json_to_sheet(data)
   utils.book_append_sheet(wb, ws, i18n.t('excel.sheet'))
   writeFile(wb, i18n.t('excel.filename', { start: start || '', end: end || '' }))
-}
-
-export async function exportPDF({ start, end, archived, includeArchived }) {
-  if (usingBackend()) return exportPDFBackend({ start, end, archived, includeArchived })
-  // local fallback uses jsPDF/html from previous implementation with CJK support
-  const rows = await getLocalByRange(start, end)
-  const jsPDF = (await import('jspdf')).default
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' })
-  // Build simple HTML table and render to PDF using browser fonts
-  const thead = [i18n.t('field.projectCode'), i18n.t('field.projectName'), i18n.t('field.client'), i18n.t('field.address'), i18n.t('field.salesPerson'), i18n.t('field.installer'), i18n.t('field.startDate'), i18n.t('field.endDate'), i18n.t('field.status')]
-  const headHtml = `<tr>${thead.map(h => `<th style="border:1px solid #ccc;padding:6px 8px;background:#e6f7ff;">${h}</th>`).join('')}</tr>`
-  const bodyHtml = rows.map(p => `
-    <tr>
-      <td style="border:1px solid #ccc;padding:6px 8px;">${p.project_code || ''}</td>
-      <td style="border:1px solid #ccc;padding:6px 8px;">${p.name || ''}</td>
-      <td style="border:1px solid #ccc;padding:6px 8px;">${p.client_name || ''}</td>
-      <td style="border:1px solid #ccc;padding:6px 8px;">${p.address || ''}</td>
-      <td style="border:1px solid #ccc;padding:6px 8px;">${p.sales_person || ''}</td>
-      <td style="border:1px solid #ccc;padding:6px 8px;">${p.installer || ''}</td>
-      <td style="border:1px solid #ccc;padding:6px 8px;">${p.start_date || ''}</td>
-      <td style="border:1px solid #ccc;padding:6px 8px;">${p.end_date || ''}</td>
-      <td style="border:1px solid #ccc;padding:6px 8px;">${i18n.t(`status.${p.status}`)}</td>
-    </tr>`).join('')
-  const mount = document.createElement('div')
-  mount.innerHTML = `
-    <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', 'Source Han Sans SC', Arial, sans-serif;">
-      <h2 style="margin:0 0 8px 0;">${i18n.t('pdf.title')}</h2>
-      <table style="border-collapse:collapse;width:100%;font-size:12px;">${headHtml}${bodyHtml}</table>
-    </div>`
-  document.body.appendChild(mount)
-  await doc.html(mount, { x: 40, y: 40, width: 515, callback: (d) => { d.save(i18n.t('pdf.filename', { start: start || '', end: end || '' })); document.body.removeChild(mount) } })
 }
 
 // Seed at least N Auckland demo projects in local mode; returns created count
