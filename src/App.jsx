@@ -300,7 +300,26 @@ function AppContent() {
 
   const qs = React.useCallback((selector) => document.querySelector(selector), [])
 
-  // Helper: ensure a project drawer is open for drawer-related steps
+  // Small DOM helpers for demo automation
+  const typeInto = React.useCallback((dataTourId, text) => {
+    const el = qs(`[data-tour-id="${dataTourId}"]`)
+    if (!el) return
+    try {
+      el.focus?.()
+      // For AntD Input/TextArea
+      const setter = Object.getOwnPropertyDescriptor(el.__proto__ || HTMLElement.prototype, 'value')?.set
+      if (setter) setter.call(el, text)
+      else el.value = text
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+      el.dispatchEvent(new Event('change', { bubbles: true }))
+    } catch {}
+  }, [qs])
+  const clickEl = React.useCallback((dataTourId) => {
+    const el = qs(`[data-tour-id="${dataTourId}"]`)
+    el?.click?.()
+  }, [qs])
+
+  // Ensure a project drawer is open for drawer-related steps
   const ensureProjectOpen = React.useCallback(async () => {
     if (!selectedProject) {
       const first = projects?.[0]
@@ -310,7 +329,8 @@ function AppContent() {
     }
   }, [selectedProject, projects])
 
-  const tourSteps = React.useMemo(() => {
+  // Build steps with aligned actions for simple demo automation
+  const tourSpec = React.useMemo(() => {
     const steps = [
       { title: t('tour.mode.title'), description: t('tour.mode.desc'), target: () => qs('[data-tour-id="mode-select"]'), placement: 'bottom' },
       { title: t('tour.lang.title'), description: t('tour.lang.desc'), target: () => qs('[data-tour-id="lang-select"]'), placement: 'bottom' },
@@ -318,55 +338,101 @@ function AppContent() {
       { title: t('tour.statusFilter.title'), description: t('tour.statusFilter.desc'), target: () => qs('[data-tour-id="status-filter"]'), placement: 'bottom' },
       { title: t('tour.archived.title'), description: t('tour.archived.desc'), target: () => qs('[data-tour-id="archived-toggle"]'), placement: 'bottom' },
       { title: t('tour.exportExcel.title'), description: t('tour.exportExcel.desc'), target: () => qs('[data-tour-id="export-excel"]'), placement: 'bottom' },
-      // Only show the seed demo step in local mode
       ...(mode === 'local' ? [
         { title: t('tour.seed.title'), description: t('tour.seed.desc'), target: () => qs('[data-tour-id="seed-demo"]') || qs('[data-tour-id="more-toggle"]') },
       ] : []),
       { title: t('tour.more.title'), description: t('tour.more.desc'), target: () => qs('[data-tour-id="more-toggle"]'), placement: 'bottom' },
       { title: t('tour.add.title'), description: t('tour.add.desc'), target: () => qs('[data-tour-id="add-project"]'), placement: 'bottom' },
     ]
-    // Add the rest of the steps (create modal, calendar, table, drawer) as before
-    return [
-      ...steps,
-      { title: t('tour.pff.name.title'), description: t('tour.pff.name.desc'), target: () => qs('[data-tour-id="pff-name"]') },
-      { title: t('tour.pff.address.title'), description: t('tour.pff.address.desc'), target: () => qs('[data-tour-id="pff-address"]') },
-      { title: t('tour.pff.clientName.title'), description: t('tour.pff.clientName.desc'), target: () => qs('[data-tour-id="pff-client-name"]') },
-      { title: t('tour.pff.clientPhone.title'), description: t('tour.pff.clientPhone.desc'), target: () => qs('[data-tour-id="pff-client-phone"]') },
-      { title: t('tour.pff.sales.title'), description: t('tour.pff.sales.desc'), target: () => qs('[data-tour-id="pff-sales-person"]') },
-      { title: t('tour.pff.installer.title'), description: t('tour.pff.installer.desc'), target: () => qs('[data-tour-id="pff-installer"]') },
-      { title: t('tour.pff.team.title'), description: t('tour.pff.team.desc'), target: () => qs('[data-tour-id="pff-team-members"]') },
-      { title: t('tour.pff.dates.title'), description: t('tour.pff.dates.desc'), target: () => qs('[data-tour-id="pff-dates"]') },
-      { title: t('tour.pff.status.title'), description: t('tour.pff.status.desc'), target: () => qs('[data-tour-id="pff-status"]') },
-      { title: t('tour.pff.today.title'), description: t('tour.pff.today.desc'), target: () => qs('[data-tour-id="pff-today-task"]') },
-      { title: t('tour.pff.note.title'), description: t('tour.pff.note.desc'), target: () => qs('[data-tour-id="pff-progress-note"]') },
-      { title: t('tour.create.ok.title'), description: t('tour.create.ok.desc'), target: () => qs('[data-tour-id="create-ok"]') },
-      { title: t('tour.create.cancel.title'), description: t('tour.create.cancel.desc'), target: () => qs('[data-tour-id="create-cancel"]') },
-      { title: t('tour.calendar.title'), description: t('tour.calendar.desc'), target: () => qs('[data-tour-id="calendar-view"]') },
-      { title: t('tour.table.title'), description: t('tour.table.desc'), target: () => qs('[data-tour-id="project-table"]') },
-      { title: t('tour.drawer.status.title'), description: t('tour.drawer.status.desc'), target: () => qs('[data-tour-id="drawer-status"]') },
-      { title: t('tour.drawer.today.title'), description: t('tour.drawer.today.desc'), target: () => qs('[data-tour-id="drawer-today-task"]') },
-      { title: t('tour.drawer.note.title'), description: t('tour.drawer.note.desc'), target: () => qs('[data-tour-id="drawer-progress-note"]') },
-      { title: t('tour.drawer.save.title'), description: t('tour.drawer.save.desc'), target: () => qs('[data-tour-id="drawer-save"]') },
-      { title: t('tour.drawer.edit.title'), description: t('tour.drawer.edit.desc'), target: () => qs('[data-tour-id="drawer-edit"]') },
-      { title: t('tour.drawer.cancelEdit.title'), description: t('tour.drawer.cancelEdit.desc'), target: () => qs('[data-tour-id="drawer-cancel-edit"]') },
-      { title: t('tour.drawer.archive.title'), description: t('tour.drawer.archive.desc'), target: () => qs('[data-tour-id="drawer-archive"]') },
-      { title: t('tour.drawer.delete.title'), description: t('tour.drawer.delete.desc'), target: () => qs('[data-tour-id="drawer-delete"]') },
-      { title: t('tour.drawer.upload.title'), description: t('tour.drawer.upload.desc'), target: () => qs('[data-tour-id="drawer-upload"]') },
-      { title: t('tour.drawer.close.title'), description: t('tour.drawer.close.desc'), target: () => qs('[data-tour-id="drawer-close"]') },
-    ]
-  }, [t, qs, mode])
 
-  // Drive UI to show the right surface for certain steps
+    const actions = [
+      // mode-select
+      async () => {},
+      // lang-select: toggle to current language (noop)
+      async () => {},
+      // search-input: set query text programmatically
+      async () => { try { setQ('Auckland') } catch {} },
+      // status-filter
+      async () => { try { setStatus('in_progress') } catch {} },
+      // archived-toggle
+      async () => { try { setIncludeArchived(true) } catch {} },
+      // export-excel
+      async () => { try { onExport('excel') } catch {} },
+      // seed-demo (only in local mode)
+      ...(mode === 'local' ? [async () => { try { await onSeedDemo() } catch {} }] : []),
+      // more-toggle: click to show actions
+      async () => { clickEl('more-toggle') },
+      // add-project: open modal
+      async () => { setCreateOpen(true) },
+    ]
+
+    // Create modal field steps: auto open modal and fill some demo text
+    const createFieldSteps = [
+      { id: 'pff-name', text: 'Demo House - Parnell' },
+      { id: 'pff-address', text: '123 Parnell Rd, Auckland' },
+      { id: 'pff-client-name', text: 'Alice' },
+      { id: 'pff-client-phone', text: '021-1234567' },
+      { id: 'pff-sales-person', text: 'Tim' },
+      { id: 'pff-installer', text: 'Peter' },
+      { id: 'pff-team-members', text: 'Peter, Jack' },
+    ]
+    createFieldSteps.forEach(({ id, text }) => {
+      steps.push({ title: t(`tour.${id.replace('pff-', 'pff.')}.title`), description: t(`tour.${id.replace('pff-', 'pff.')}.desc`), target: () => qs(`[data-tour-id="${id}"]`) })
+      actions.push(async () => { setCreateOpen(true); setTimeout(() => typeInto(id, text), 50) })
+    })
+    // Dates, status, today task, note
+    steps.push({ title: t('tour.pff.dates.title'), description: t('tour.pff.dates.desc'), target: () => qs('[data-tour-id="pff-dates"]') })
+    actions.push(async () => { setCreateOpen(true); /* leave manual pick to user */ })
+
+    steps.push({ title: t('tour.pff.status.title'), description: t('tour.pff.status.desc'), target: () => qs('[data-tour-id="pff-status"]') })
+    actions.push(async () => { setCreateOpen(true) })
+
+    steps.push({ title: t('tour.pff.today.title'), description: t('tour.pff.today.desc'), target: () => qs('[data-tour-id="pff-today-task"]') })
+    actions.push(async () => { setCreateOpen(true); setTimeout(() => typeInto('pff-today-task', 'Install window frames'), 50) })
+
+    steps.push({ title: t('tour.pff.note.title'), description: t('tour.pff.note.desc'), target: () => qs('[data-tour-id="pff-progress-note"]') })
+    actions.push(async () => { setCreateOpen(true); setTimeout(() => typeInto('pff-progress-note', 'Prep done, starting install.'), 50) })
+
+    steps.push({ title: t('tour.create.ok.title'), description: t('tour.create.ok.desc'), target: () => qs('[data-tour-id="create-ok"]') })
+    actions.push(async () => { /* avoid auto-submit to skip validations */ })
+    steps.push({ title: t('tour.create.cancel.title'), description: t('tour.create.cancel.desc'), target: () => qs('[data-tour-id="create-cancel"]') })
+    actions.push(async () => {})
+
+    // Calendar and table steps
+    steps.push({ title: t('tour.calendar.title'), description: t('tour.calendar.desc'), target: () => qs('[data-tour-id="calendar-view"]') })
+    actions.push(async () => {})
+    steps.push({ title: t('tour.table.title'), description: t('tour.table.desc'), target: () => qs('[data-tour-id="project-table"]') })
+    actions.push(async () => {})
+
+    // Drawer quick update and actions
+    steps.push({ title: t('tour.drawer.status.title'), description: t('tour.drawer.status.desc'), target: () => qs('[data-tour-id="drawer-status"]') })
+    actions.push(async () => { await ensureProjectOpen() })
+    steps.push({ title: t('tour.drawer.today.title'), description: t('tour.drawer.today.desc'), target: () => qs('[data-tour-id="drawer-today-task"]') })
+    actions.push(async () => { await ensureProjectOpen(); setTimeout(() => typeInto('drawer-today-task', 'Measure frames'), 50) })
+    steps.push({ title: t('tour.drawer.note.title'), description: t('tour.drawer.note.desc'), target: () => qs('[data-tour-id="drawer-progress-note"]') })
+    actions.push(async () => { await ensureProjectOpen(); setTimeout(() => typeInto('drawer-progress-note', 'All materials on-site.'), 50) })
+    steps.push({ title: t('tour.drawer.save.title'), description: t('tour.drawer.save.desc'), target: () => qs('[data-tour-id="drawer-save"]') })
+    actions.push(async () => { await ensureProjectOpen() })
+    steps.push({ title: t('tour.drawer.edit.title'), description: t('tour.drawer.edit.desc'), target: () => qs('[data-tour-id="drawer-edit"]') })
+    actions.push(async () => { await ensureProjectOpen() })
+    steps.push({ title: t('tour.drawer.cancelEdit.title'), description: t('tour.drawer.cancelEdit.desc'), target: () => qs('[data-tour-id="drawer-cancel-edit"]') })
+    actions.push(async () => { await ensureProjectOpen() })
+    steps.push({ title: t('tour.drawer.archive.title'), description: t('tour.drawer.archive.desc'), target: () => qs('[data-tour-id="drawer-archive"]') })
+    actions.push(async () => { await ensureProjectOpen() })
+    steps.push({ title: t('tour.drawer.delete.title'), description: t('tour.drawer.delete.desc'), target: () => qs('[data-tour-id="drawer-delete"]') })
+    actions.push(async () => { await ensureProjectOpen() })
+    steps.push({ title: t('tour.drawer.upload.title'), description: t('tour.drawer.upload.desc'), target: () => qs('[data-tour-id="drawer-upload"]') })
+    actions.push(async () => { await ensureProjectOpen() })
+    steps.push({ title: t('tour.drawer.close.title'), description: t('tour.drawer.close.desc'), target: () => qs('[data-tour-id="drawer-close"]') })
+    actions.push(async () => { await ensureProjectOpen() })
+
+    return { steps, actions }
+  }, [t, qs, mode, setQ, setStatus, setIncludeArchived])
+
+  // Drive UI and run step automation
   const onTourChange = React.useCallback(async (current) => {
-    // Steps 10-22 are in the Create modal
-    if (current >= 10 && current <= 22) {
-      setCreateOpen(true)
-    }
-    // Steps 25-34 are in the Drawer
-    if (current >= 25 && current <= 34) {
-      await ensureProjectOpen()
-    }
-  }, [ensureProjectOpen])
+    try { await tourSpec.actions?.[current]?.() } catch {}
+  }, [tourSpec])
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -427,7 +493,7 @@ function AppContent() {
         confirmLoading={createLoading}
       />
 
-      <Tour open={tourOpen} onClose={() => setTourOpen(false)} steps={tourSteps} mask closable onChange={onTourChange} />
+      <Tour open={tourOpen} onClose={() => setTourOpen(false)} steps={tourSpec.steps} mask closable onChange={onTourChange} />
     </div>
   )
 }

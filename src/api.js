@@ -222,7 +222,7 @@ function mapToBackendWithBothKeys(values = {}) {
 async function listProjectsBackend(params = {}) {
   const q = { ...params }
   if (!params?.includeArchived) q.archived = false
-  const { data } = await client().get('/api/projects', { params: q })
+  const { data } = await client().get('/rangi_windows/api/projects', { params: q })
   // New BE returns envelope { items, page, pageSize, total }
   let items = []
   let page = Number(params.page) || 1
@@ -243,53 +243,53 @@ async function listProjectsBackend(params = {}) {
   return { items: items.map(p => mapToFrontend(p)), page, pageSize, total }
 }
 async function getProjectBackend(id) {
-  const { data } = await client().get(`/api/projects/${id}`)
+  const { data } = await client().get(`/rangi_windows/api/projects/${id}`)
   if (!data) throw new Error('Project not found')
   return mapToFrontend(data)
 }
 async function createProjectBackend(values) {
   const payload = mapToBackendWithBothKeys(values)
-  const { data } = await client().post('/api/projects', payload)
+  const { data } = await client().post('/rangi_windows/api/projects', payload)
   return mapToFrontend(data)
 }
 async function updateProjectBackend(id, values) {
   const payload = mapToBackendWithBothKeys(values)
-  const { data } = await client().patch(`/api/projects/${id}`, payload)
+  const { data } = await client().patch(`/rangi_windows/api/projects/${id}`, payload)
   return mapToFrontend(data)
 }
 async function archiveProjectBackend(id, archived = true) {
-  const { data } = await client().patch(`/api/projects/${id}`, { archived })
+  const { data } = await client().patch(`/rangi_windows/api/projects/${id}`, { archived })
   return mapToFrontend(data)
 }
 async function deleteProjectBackend(id) {
-  await client().delete(`/api/projects/${id}`)
+  await client().delete(`/rangi_windows/api/projects/${id}`)
   return true
 }
 async function uploadPhotoBackend(id, file) {
   const fd = new FormData()
   fd.append('file', file)
-  const { data } = await client().post(`/api/projects/${id}/photo`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+  const { data } = await client().post(`/rangi_windows/api/projects/${id}/photo`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
   return data
 }
 async function listProjectPhotosBackend(id) {
-  const { data } = await client().get(`/api/projects/${id}/photos`)
+  const { data } = await client().get(`/rangi_windows/api/projects/${id}/photos`)
   return Array.isArray(data) ? data : []
 }
 async function deleteProjectPhotoBackend(id, photoId) {
-  await client().delete(`/api/projects/${id}/photos/${photoId}`)
+  await client().delete(`/rangi_windows/api/projects/${id}/photos/${photoId}`)
   return true
 }
 async function deleteProjectPhotoByTokenBackend(id, token) {
-  await client().delete(`/api/projects/${id}/photo/${token}`)
+  await client().delete(`/rangi_windows/api/projects/${id}/photo/${token}`)
   return true
 }
 async function deleteAllProjectPhotosBackend(id) {
-  await client().delete(`/api/projects/${id}/photos`)
+  await client().delete(`/rangi_windows/api/projects/${id}/photos`)
   return true
 }
 async function exportExcelBackend({ start, end, archived, includeArchived }) {
   const name = `施工安排表_${start || ''}_${end || ''}.xlsx`
-  await downloadBlob(() => client().get('/api/export/excel', { params: { start, end, archived, includeArchived }, responseType: 'blob' }), name)
+  await downloadBlob(() => client().get('/rangi_windows/api/export/excel', { params: { start, end, archived, includeArchived }, responseType: 'blob' }), name)
 }
 
 // ---------------- Public API (switches by runtime mode) ----------------
@@ -437,7 +437,7 @@ export async function deleteAllProjectPhotos(id) {
 
 export function getPhotoDownloadUrl(projectId, token) {
   const base = getApiBaseUrl() || ''
-  return `${base}/api/projects/${projectId}/photo/${token}`
+  return `${base}/rangi_windows/api/projects/${projectId}/photo/${token}`
 }
 
 async function getLocalByRange(start, end) { return loadLocal().filter(p => inRange(p, start, end)) }
