@@ -43,6 +43,8 @@
   "field.teamMembers": "團隊成員",
   "field.dateRange": "施工日期",
   "photos.section": "現場照片",
+  "field.glassOrdered": "玻璃已下單",
+  "field.glassManufactured": "玻璃已生產",
 
   "status.not_started": "未開始",
   "status.in_progress": "施工中",
@@ -174,5 +176,10 @@
   "tour.drawer.upload.title": "上傳照片",
   "tour.drawer.upload.desc": "替專案附加現場照片。",
   "tour.drawer.close.title": "關閉",
-  "tour.drawer.close.desc": "關閉面板並返回列表。"
+  "tour.drawer.close.desc": "關閉面板並返回列表。",
+
+  "common.yes": "是",
+  "common.no": "否",
+  "help.glassOrdered": "勾選表示已向供應商下單",
+  "help.glassManufactured": "勾選表示生產完成並可安裝"
 }

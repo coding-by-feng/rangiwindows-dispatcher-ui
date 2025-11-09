@@ -141,6 +141,9 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
                 <Descriptions.Item label={t('field.salesPerson')}>{project.sales_person}</Descriptions.Item>
                 <Descriptions.Item label={t('field.installer')}>{project.installer}</Descriptions.Item>
                 <Descriptions.Item label={t('field.dateRange')}>{project.start_date} ~ {project.end_date}</Descriptions.Item>
+                {/* Glass flags (read-only view) */}
+                <Descriptions.Item label={t('field.glassOrdered')}>{project.glass_ordered ? t('common.yes') : t('common.no')}</Descriptions.Item>
+                <Descriptions.Item label={t('field.glassManufactured')}>{project.glass_manufactured ? t('common.yes') : t('common.no')}</Descriptions.Item>
               </Descriptions>
             )}
 

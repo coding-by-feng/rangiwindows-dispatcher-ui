@@ -121,6 +121,7 @@ function AppContent() {
     message.open({ type: 'loading', content: t('loading.fetching'), key })
     try {
       const p = await getProject(id)
+      console.log('Fetched project:', p)
       setSelectedProject(p)
       try {
         const photos = await listProjectPhotos(id)

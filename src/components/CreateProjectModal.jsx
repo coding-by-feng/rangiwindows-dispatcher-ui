@@ -27,6 +27,8 @@ export default function CreateProjectModal({ open, onCancel, onOk, confirmLoadin
       status: values.status || 'not_started',
       today_task: values.today_task || '',
       progress_note: values.progress_note || '',
+      glass_ordered: values.glass_ordered === true, // normalize null/undefined -> false
+      glass_manufactured: values.glass_manufactured === true && values.glass_ordered === true, // enforce sequence
     }
     await onOk?.(payload)
     form.resetFields()
@@ -54,7 +56,7 @@ export default function CreateProjectModal({ open, onCancel, onOk, confirmLoadin
         <Form
             form={form}
             layout="vertical"
-            initialValues={{ status: 'not_started' }}
+            initialValues={{ status: 'not_started', glass_ordered: false, glass_manufactured: false }}
             requiredMark={false}
         >
           {/* Two-column layout on desktop, single column on mobile */}

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Form, Input, DatePicker, Select, Grid } from 'antd'
+import { Form, Input, DatePicker, Select, Grid, Radio } from 'antd'
 import { useTranslation } from 'react-i18next'
 
 /**
@@ -38,7 +38,22 @@ export default function ProjectFormFields({ disabled = false, showNotes = true, 
     status: 'pff-status',
     today: 'pff-today-task',
     note: 'pff-progress-note',
+    glassOrdered: 'pff-glass-ordered',
+    glassManufactured: 'pff-glass-manufactured',
   }), [])
+
+  // Access form instance to watch dependencies
+  const form = Form.useFormInstance?.()
+  const glassOrderedVal = Form.useWatch ? Form.useWatch('glass_ordered', form) : undefined
+  const isGlassOrdered = !!glassOrderedVal
+
+  React.useEffect(() => {
+    if (!isGlassOrdered && form) {
+      // Ensure manufactured flag resets if ordered is turned off
+      const current = form.getFieldValue('glass_manufactured')
+      if (current) form.setFieldsValue({ glass_manufactured: false })
+    }
+  }, [isGlassOrdered, form])
 
   return (
     <div className={gridClass}>
@@ -87,7 +102,23 @@ export default function ProjectFormFields({ disabled = false, showNotes = true, 
         <Select aria-label={t('field.status')} disabled={disabled} options={statusOptions} onChange={onStatusChange} getPopupContainer={() => document.body} data-tour-id="pff-status" />
       </Form.Item>
 
-      {layout === 'two-column' && <div className="sm:col-span-2" />}
+      {/* Glass workflow flags - same row */}
+      <div className={layout === 'two-column' ? 'sm:col-span-2' : ''}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Form.Item name="glass_ordered" label={<label htmlFor={ids.glassOrdered}>{t('field.glassOrdered')}</label>} extra={t('help.glassOrdered')}>
+            <Radio.Group id={ids.glassOrdered} aria-label={t('field.glassOrdered')} disabled={disabled} optionType="button" buttonStyle="solid" data-tour-id="pff-glass-ordered">
+              <Radio value={true}>{t('common.yes')}</Radio>
+              <Radio value={false}>{t('common.no')}</Radio>
+            </Radio.Group>
+          </Form.Item>
+          <Form.Item name="glass_manufactured" label={<label htmlFor={ids.glassManufactured}>{t('field.glassManufactured')}</label>} extra={t('help.glassManufactured')}>
+            <Radio.Group id={ids.glassManufactured} aria-label={t('field.glassManufactured')} disabled={disabled || !isGlassOrdered} optionType="button" buttonStyle="solid" data-tour-id="pff-glass-manufactured">
+              <Radio value={true}>{t('common.yes')}</Radio>
+              <Radio value={false}>{t('common.no')}</Radio>
+            </Radio.Group>
+          </Form.Item>
+        </div>
+      </div>
 
       <Form.Item name="today_task" label={<label htmlFor={ids.today}>{t('field.todayTask')}</label>} className={layout === 'two-column' ? 'sm:col-span-2' : ''}>
         <Input.TextArea id={ids.today} aria-label={t('field.todayTask')} rows={2} placeholder={t('placeholder.todayTask')} disabled={disabled} data-tour-id="pff-today-task" />

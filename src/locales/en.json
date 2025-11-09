@@ -42,6 +42,8 @@
   "field.teamMembers": "Team Members",
   "field.dateRange": "Date Range",
   "photos.section": "Site Photos",
+  "field.glassOrdered": "Glass Ordered",
+  "field.glassManufactured": "Glass Manufactured",
 
   "status.not_started": "Not Started",
   "status.in_progress": "In Progress",
@@ -183,5 +185,10 @@
   "tour.drawer.upload.title": "Upload photo",
   "tour.drawer.upload.desc": "Attach site photos to the project.",
   "tour.drawer.close.title": "Close",
-  "tour.drawer.close.desc": "Close the panel and return to the list."
+  "tour.drawer.close.desc": "Close the panel and return to the list.",
+
+  "common.yes": "Yes",
+  "common.no": "No",
+  "help.glassOrdered": "Check when glass has been ordered from supplier.",
+  "help.glassManufactured": "Check when glass production is completed and ready for install."
 }

@@ -186,6 +186,8 @@ function mapToFrontend(p = {}) {
     photo_url: pick('photo_url', 'photoUrl'),
     archived: p.archived,
     created_at: p.created_at !== undefined ? p.created_at : toIsoFromCreatedAt(p.createdAt),
+    glass_ordered: (p.glass_ordered !== undefined ? p.glass_ordered : p.glassOrdered) === true, // treat null/false as false
+    glass_manufactured: (p.glass_manufactured !== undefined ? p.glass_manufactured : p.glassManufactured) === true,
   }
 }
 function mapToBackend(values = {}) {
@@ -207,6 +209,8 @@ function mapToBackend(values = {}) {
     progressNote: values.progress_note,
     // photoUrl removed in new BE spec
     archived: values.archived,
+    glassOrdered: values.glass_ordered === true,
+    glassManufactured: values.glass_manufactured === true,
   }
   // Remove undefined keys to keep payload clean
   Object.keys(out).forEach(k => out[k] === undefined && delete out[k])
@@ -343,6 +347,8 @@ export async function createProject(values) {
     photo_url: '',
     archived: false,
     created_at: dayjs().toISOString(),
+    glass_ordered: values.glass_ordered === true,
+    glass_manufactured: values.glass_manufactured === true && values.glass_ordered === true,
   }
   saveLocal([...list, project])
   return project
@@ -353,7 +359,13 @@ export async function updateProject(id, values) {
   const list = loadLocal()
   const idx = list.findIndex(p => String(p.id) === String(id))
   if (idx === -1) throw new Error('Project not found')
-  const updated = { ...list[idx], ...values }
+  const current = list[idx]
+  const updated = {
+    ...current,
+    ...values,
+    glass_ordered: values.glass_ordered !== undefined ? (values.glass_ordered === true) : current.glass_ordered === true,
+    glass_manufactured: values.glass_manufactured !== undefined ? (values.glass_manufactured === true && (values.glass_ordered !== undefined ? values.glass_ordered === true : current.glass_ordered === true)) : current.glass_manufactured === true,
+  }
   list[idx] = updated
   saveLocal(list)
   return updated
