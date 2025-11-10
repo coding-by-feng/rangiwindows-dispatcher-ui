@@ -1,7 +1,7 @@
 // Centralized runtime config sourced from Vite envs (env.* files)
 // Keep host/port only in env files; avoid hardcoded fallbacks in code.
 
-export const ENV_DEFAULT_MODE = import.meta?.env?.VITE_API_MODE || 'local'
+export const ENV_DEFAULT_MODE = import.meta?.env?.VITE_API_MODE || 'backend-prod'
 
 // If not provided, defaults to empty string -> same-origin (use Vite proxy in dev)
 export const API_BASE_FALLBACK = import.meta?.env?.VITE_API_BASE || ''
