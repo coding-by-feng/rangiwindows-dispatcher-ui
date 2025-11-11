@@ -13,7 +13,8 @@ function toEvents(projects, t) {
   const list = Array.isArray(projects) ? projects : []
   const label = (raw) => {
     const code = normalizeStatus(raw)
-    if (code === 'not_started' || code === 'in_progress' || code === 'completed') {
+    const allowed = ['glass_ordered', 'doors_windows_produced', 'doors_windows_delivered', 'doors_windows_installed', 'final_payment_received']
+    if (allowed.includes(code)) {
       return t(`status.${code}`)
     }
     return raw || ''

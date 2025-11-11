@@ -42,13 +42,17 @@
   "field.progressNote": "状态备注",
   "field.teamMembers": "团队成员",
   "field.dateRange": "施工日期",
+  "field.changeNote": "项目变更",
   "photos.section": "现场照片",
-  "field.glassOrdered": "玻璃已下单",
-  "field.glassManufactured": "玻璃已生产",
 
   "status.not_started": "未开始",
   "status.in_progress": "施工中",
   "status.completed": "完成",
+  "status.glass_ordered": "玻璃已下单",
+  "status.doors_windows_produced": "门窗已生产",
+  "status.doors_windows_delivered": "门窗已送货",
+  "status.doors_windows_installed": "门窗已安装",
+  "status.final_payment_received": "尾款已收到",
 
   "modal.create.title": "新增项目",
   "modal.create.ok": "创建",
@@ -102,6 +106,7 @@
   "placeholder.teamMembers": "逗号分隔：Peter, Jack",
   "placeholder.todayTask": "例如：安装窗框（12个）",
   "placeholder.progressNote": "进度说明、完成百分比等",
+  "placeholder.changeNote": "范围/计划调整记录",
 
   "validation.requiredProjectName": "请输入项目名称",
   "validation.requiredAddress": "请输入地址",

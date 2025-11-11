@@ -45,10 +45,16 @@
   "photos.section": "現場照片",
   "field.glassOrdered": "玻璃已下單",
   "field.glassManufactured": "玻璃已生產",
+  "field.changeNote": "變更備註",
 
   "status.not_started": "未開始",
   "status.in_progress": "施工中",
   "status.completed": "完成",
+  "status.glass_ordered": "玻璃已下單",
+  "status.doors_windows_produced": "門窗已生產",
+  "status.doors_windows_delivered": "門窗已送貨",
+  "status.doors_windows_installed": "門窗已安裝",
+  "status.final_payment_received": "尾款已收到",
 
   "modal.create.title": "新增專案",
   "modal.create.ok": "建立",
@@ -94,6 +100,7 @@
   "placeholder.teamMembers": "逗號分隔：Peter, Jack",
   "placeholder.todayTask": "例如：安裝窗框（12個）",
   "placeholder.progressNote": "進度說明、完成百分比等",
+  "placeholder.changeNote": "範圍/計畫調整記錄",
 
   "validation.requiredProjectName": "請輸入專案名稱",
   "validation.requiredAddress": "請輸入地址",

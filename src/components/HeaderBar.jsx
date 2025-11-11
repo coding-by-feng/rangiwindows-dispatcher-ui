@@ -48,14 +48,16 @@ export default function HeaderBar({ onSearch, onAdd, onExportExcel, status, onSt
         <Select
           allowClear
           placeholder={t('filter.status')}
-          className="w-full sm:w-32"
+          className="w-full sm:w-40"
           value={status}
           onChange={onStatusChange}
           data-tour-id="status-filter"
           options={[
-            { label: t('status.not_started'), value: 'not_started' },
-            { label: t('status.in_progress'), value: 'in_progress' },
-            { label: t('status.completed'), value: 'completed' },
+            { label: t('status.glass_ordered'), value: 'glass_ordered' },
+            { label: t('status.doors_windows_produced'), value: 'doors_windows_produced' },
+            { label: t('status.doors_windows_delivered'), value: 'doors_windows_delivered' },
+            { label: t('status.doors_windows_installed'), value: 'doors_windows_installed' },
+            { label: t('status.final_payment_received'), value: 'final_payment_received' },
           ]}
         />
         <div className="flex items-center gap-1" data-tour-id="archived-toggle">

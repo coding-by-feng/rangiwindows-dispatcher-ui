@@ -24,11 +24,10 @@ export default function CreateProjectModal({ open, onCancel, onOk, confirmLoadin
       team_members: values.team_members,
       start_date,
       end_date,
-      status: values.status || 'not_started',
+      status: values.status || 'glass_ordered',
       today_task: values.today_task || '',
       progress_note: values.progress_note || '',
-      glass_ordered: values.glass_ordered === true, // normalize null/undefined -> false
-      glass_manufactured: values.glass_manufactured === true && values.glass_ordered === true, // enforce sequence
+      change_note: values.change_note || '',
     }
     await onOk?.(payload)
     form.resetFields()
@@ -56,7 +55,7 @@ export default function CreateProjectModal({ open, onCancel, onOk, confirmLoadin
         <Form
             form={form}
             layout="vertical"
-            initialValues={{ status: 'not_started', glass_ordered: false, glass_manufactured: false }}
+            initialValues={{ status: 'glass_ordered' }}
             requiredMark={false}
         >
           {/* Two-column layout on desktop, single column on mobile */}

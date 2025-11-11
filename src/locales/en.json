@@ -41,13 +41,17 @@
   "field.progressNote": "Progress Note",
   "field.teamMembers": "Team Members",
   "field.dateRange": "Date Range",
+  "field.changeNote": "Change Note",
   "photos.section": "Site Photos",
-  "field.glassOrdered": "Glass Ordered",
-  "field.glassManufactured": "Glass Manufactured",
 
   "status.not_started": "Not Started",
   "status.in_progress": "In Progress",
   "status.completed": "Completed",
+  "status.glass_ordered": "Glass Ordered",
+  "status.doors_windows_produced": "Doors/Windows Produced",
+  "status.doors_windows_delivered": "Doors/Windows Delivered",
+  "status.doors_windows_installed": "Doors/Windows Installed",
+  "status.final_payment_received": "Final Payment Received",
 
   "modal.create.title": "Create Project",
   "modal.create.ok": "Create",
@@ -100,6 +104,7 @@
   "placeholder.teamMembers": "Comma separated: Peter, Jack",
   "placeholder.todayTask": "e.g., Install 12 window frames",
   "placeholder.progressNote": "Progress, completion percentage, etc.",
+  "placeholder.changeNote": "Notes on scope/plan changes",
 
   "validation.requiredProjectName": "Please enter project name",
   "validation.requiredAddress": "Please enter address",
@@ -188,7 +193,5 @@
   "tour.drawer.close.desc": "Close the panel and return to the list.",
 
   "common.yes": "Yes",
-  "common.no": "No",
-  "help.glassOrdered": "Check when glass has been ordered from supplier.",
-  "help.glassManufactured": "Check when glass production is completed and ready for install."
+  "common.no": "No"
 }

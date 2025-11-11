@@ -11,13 +11,24 @@ export default function ProjectTable({ projects = [], loading, onRowClick, pagin
 
   const statusColor = (codeRaw) => {
     const code = normalizeStatus(codeRaw)
-    return code === 'completed' ? 'green' : code === 'in_progress' ? 'blue' : 'default'
+    switch (code) {
+      case 'final_payment_received':
+        return 'green'
+      case 'doors_windows_installed':
+        return 'blue'
+      case 'doors_windows_delivered':
+        return 'cyan'
+      case 'doors_windows_produced':
+        return 'gold'
+      case 'glass_ordered':
+      default:
+        return 'default'
+    }
   }
   const statusText = (raw) => {
     const code = normalizeStatus(raw)
-    if (code === 'not_started' || code === 'in_progress' || code === 'completed') {
-      return t(`status.${code}`)
-    }
+    const allowed = ['glass_ordered', 'doors_windows_produced', 'doors_windows_delivered', 'doors_windows_installed', 'final_payment_received']
+    if (allowed.includes(code)) return t(`status.${code}`)
     return raw || '-'
   }
 
@@ -30,11 +41,13 @@ export default function ProjectTable({ projects = [], loading, onRowClick, pagin
     { title: t('field.startDate'), dataIndex: 'start_date', key: 'start_date', width: 120, sorter: (a, b) => new Date(a.start_date || 0) - new Date(b.start_date || 0), render: v => v ? dayjs(v).format('YYYY-MM-DD') : '', responsive: ['xs', 'sm', 'md', 'lg'] },
     { title: t('field.endDate'), dataIndex: 'end_date', key: 'end_date', width: 120, sorter: (a, b) => new Date(a.end_date || 0) - new Date(b.end_date || 0), render: v => v ? dayjs(v).format('YYYY-MM-DD') : '', responsive: ['sm', 'md', 'lg'] },
     {
-      title: t('field.status'), dataIndex: 'status', key: 'status', width: 100, responsive: ['xs', 'sm', 'md', 'lg'],
+      title: t('field.status'), dataIndex: 'status', key: 'status', width: 160, responsive: ['xs', 'sm', 'md', 'lg'],
       filters: [
-        { text: t('status.not_started'), value: 'not_started' },
-        { text: t('status.in_progress'), value: 'in_progress' },
-        { text: t('status.completed'), value: 'completed' },
+        { text: t('status.glass_ordered'), value: 'glass_ordered' },
+        { text: t('status.doors_windows_produced'), value: 'doors_windows_produced' },
+        { text: t('status.doors_windows_delivered'), value: 'doors_windows_delivered' },
+        { text: t('status.doors_windows_installed'), value: 'doors_windows_installed' },
+        { text: t('status.final_payment_received'), value: 'final_payment_received' },
       ],
       onFilter: (val, record) => normalizeStatus(record.status) === val,
       render: (v) => (

@@ -200,6 +200,6 @@ test.describe('API calls wiring', () => {
 
     // Status filter triggers list again
     await page.getByPlaceholder('状态筛选').click()
-    await page.getByRole('option', { name: '施工中' }).click()
+    await page.getByRole('option', { name: '门窗已生产' }).click()
   })
 })

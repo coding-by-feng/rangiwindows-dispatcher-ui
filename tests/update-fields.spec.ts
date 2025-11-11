@@ -88,9 +88,9 @@ test.describe('Project update payload', () => {
     await dateInputs.nth(1).fill('2025-10-06')
     await dateInputs.nth(1).press('Enter')
 
-    // Change status to completed
+    // Change status to final payment received
     await drawer.getByLabel('状态').click()
-    const option = page.getByRole('option', { name: '完成' })
+    const option = page.getByRole('option', { name: '尾款已收到' })
     await option.waitFor({ state: 'visible' })
     await option.click()
 
@@ -119,7 +119,7 @@ test.describe('Project update payload', () => {
       sales_person: 'Ben',
       installer: 'Jack',
       team_members: 'Jack, Liam',
-      status: 'completed',
+      status: 'final_payment_received',
       today_task: 'Install windows',
       progress_note: '80% done',
     })

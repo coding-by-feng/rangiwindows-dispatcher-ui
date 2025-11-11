@@ -186,8 +186,7 @@ function mapToFrontend(p = {}) {
     photo_url: pick('photo_url', 'photoUrl'),
     archived: p.archived,
     created_at: p.created_at !== undefined ? p.created_at : toIsoFromCreatedAt(p.createdAt),
-    glass_ordered: (p.glass_ordered !== undefined ? p.glass_ordered : p.glassOrdered) === true, // treat null/false as false
-    glass_manufactured: (p.glass_manufactured !== undefined ? p.glass_manufactured : p.glassManufactured) === true,
+    change_note: pick('change_note', 'changeNote'),
   }
 }
 function mapToBackend(values = {}) {
@@ -209,8 +208,7 @@ function mapToBackend(values = {}) {
     progressNote: values.progress_note,
     // photoUrl removed in new BE spec
     archived: values.archived,
-    glassOrdered: values.glass_ordered === true,
-    glassManufactured: values.glass_manufactured === true,
+    changeNote: values.change_note,
   }
   // Remove undefined keys to keep payload clean
   Object.keys(out).forEach(k => out[k] === undefined && delete out[k])
@@ -341,14 +339,13 @@ export async function createProject(values) {
     team_members: values.team_members,
     start_date: values.start_date,
     end_date: values.end_date,
-    status: values.status || 'not_started',
+    status: values.status || 'glass_ordered',
     today_task: values.today_task || '',
     progress_note: values.progress_note || '',
     photo_url: '',
     archived: false,
     created_at: dayjs().toISOString(),
-    glass_ordered: values.glass_ordered === true,
-    glass_manufactured: values.glass_manufactured === true && values.glass_ordered === true,
+    change_note: values.change_note || '',
   }
   saveLocal([...list, project])
   return project
@@ -363,8 +360,6 @@ export async function updateProject(id, values) {
   const updated = {
     ...current,
     ...values,
-    glass_ordered: values.glass_ordered !== undefined ? (values.glass_ordered === true) : current.glass_ordered === true,
-    glass_manufactured: values.glass_manufactured !== undefined ? (values.glass_manufactured === true && (values.glass_ordered !== undefined ? values.glass_ordered === true : current.glass_ordered === true)) : current.glass_manufactured === true,
   }
   list[idx] = updated
   saveLocal(list)
@@ -468,6 +463,7 @@ export async function exportExcel({ start, end, archived, includeArchived }) {
     [i18n.t('field.startDate')]: p.start_date,
     [i18n.t('field.endDate')]: p.end_date,
     [i18n.t('field.status')]: i18n.t(`status.${p.status}`),
+    [i18n.t('field.changeNote')]: p.change_note,
   }))
   const wb = utils.book_new(); const ws = utils.json_to_sheet(data)
   utils.book_append_sheet(wb, ws, i18n.t('excel.sheet'))
@@ -492,7 +488,7 @@ export async function seedAucklandDemos(min = 10) {
   const clients = ['Liam', 'Noah', 'Olivia', 'Emma', 'Ava', 'William', 'James', 'Lucas', 'Mia', 'Isabella']
   const sales = ['Amy', 'Ben', 'Chris', 'Dylan', 'Ethan']
   const installers = ['Peter', 'Jack', 'Liam', 'Noah', 'Oliver']
-  const statuses = ['not_started', 'in_progress', 'completed']
+  const statuses = ['glass_ordered', 'doors_windows_produced', 'doors_windows_delivered', 'doors_windows_installed', 'final_payment_received']
 
   function rand(arr) { return arr[Math.floor(Math.random() * arr.length)] }
   function randInt(minVal, maxVal) { return Math.floor(Math.random() * (maxVal - minVal + 1)) + minVal }

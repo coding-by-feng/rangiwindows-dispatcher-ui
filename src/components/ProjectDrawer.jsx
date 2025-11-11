@@ -30,7 +30,8 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
     return typeof v === 'string' ? v : ''
   }, [])
 
-  const isCompleted = normalizeStatus(project?.status) === 'completed'
+  // Consider project finalized when final payment is received
+  const isFinalized = normalizeStatus(project?.status) === 'final_payment_received'
 
   React.useEffect(() => {
     if (project) {
@@ -67,7 +68,7 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
   const handleDeleteConfirm = () => { onDelete?.() }
 
   const handleEnterEdit = () => {
-    if (isCompleted) return
+    if (isFinalized) return
     setEditMode(true)
     setShowNotes(false)
     const values = { ...project, dates: [project?.start_date ? dayjs(project.start_date) : null, project?.end_date ? dayjs(project.end_date) : null].filter(Boolean) }
@@ -81,9 +82,11 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
   }
 
   const statusOptions = [
-    { label: t('status.not_started'), value: 'not_started' },
-    { label: t('status.in_progress'), value: 'in_progress' },
-    { label: t('status.completed'), value: 'completed' },
+    { label: t('status.glass_ordered'), value: 'glass_ordered' },
+    { label: t('status.doors_windows_produced'), value: 'doors_windows_produced' },
+    { label: t('status.doors_windows_delivered'), value: 'doors_windows_delivered' },
+    { label: t('status.doors_windows_installed'), value: 'doors_windows_installed' },
+    { label: t('status.final_payment_received'), value: 'final_payment_received' },
   ]
 
   // Build gallery items from photos (backend) and legacy local photo_url
@@ -122,7 +125,7 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
       <div className="flex items-center gap-2">
         <span>{t('drawer.title')} {project?.project_code || ''}</span>
         {project?.archived ? <Tag>{t('tag.archived')}</Tag> : null}
-        {isCompleted ? <Tag color="green">{t('tag.completed')}</Tag> : null}
+        {isFinalized ? <Tag color="green">{t('tag.completed')}</Tag> : null}
       </div>
     )} destroyOnHidden>
       {(!project && loading) && (
@@ -141,9 +144,6 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
                 <Descriptions.Item label={t('field.salesPerson')}>{project.sales_person}</Descriptions.Item>
                 <Descriptions.Item label={t('field.installer')}>{project.installer}</Descriptions.Item>
                 <Descriptions.Item label={t('field.dateRange')}>{project.start_date} ~ {project.end_date}</Descriptions.Item>
-                {/* Glass flags (read-only view) */}
-                <Descriptions.Item label={t('field.glassOrdered')}>{project.glass_ordered ? t('common.yes') : t('common.no')}</Descriptions.Item>
-                <Descriptions.Item label={t('field.glassManufactured')}>{project.glass_manufactured ? t('common.yes') : t('common.no')}</Descriptions.Item>
               </Descriptions>
             )}
 
@@ -151,25 +151,28 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
             <Form layout="vertical" form={form} initialValues={project} onFinish={onFinish} requiredMark={false}>
               {editMode ? (
                 // Use shared fields in a single-column layout
-                <ProjectFormFields disabled={isCompleted} showNotes={showNotes} onStatusChange={() => setShowNotes(true)} layout="one-column" withValidation={true} />
+                <ProjectFormFields disabled={isFinalized} showNotes={showNotes} onStatusChange={() => setShowNotes(true)} layout="one-column" withValidation={true} />
               ) : (
                 <>
                   <Form.Item name="today_task" label={t('field.todayTask')}>
-                    <Input.TextArea rows={2} placeholder={t('placeholder.todayTask')} disabled={isCompleted} data-tour-id="drawer-today-task" />
+                    <Input.TextArea rows={2} placeholder={t('placeholder.todayTask')} disabled={isFinalized} data-tour-id="drawer-today-task" />
                   </Form.Item>
                   <Form.Item name="progress_note" label={t('field.progressNote')}>
-                    <Input.TextArea rows={3} placeholder={t('placeholder.progressNote')} disabled={isCompleted} data-tour-id="drawer-progress-note" />
+                    <Input.TextArea rows={3} placeholder={t('placeholder.progressNote')} disabled={isFinalized} data-tour-id="drawer-progress-note" />
+                  </Form.Item>
+                  <Form.Item name="change_note" label={t('field.changeNote')}>
+                    <Input.TextArea rows={2} placeholder={t('placeholder.changeNote')} disabled={isFinalized} data-tour-id="drawer-change-note" />
                   </Form.Item>
                   <Form.Item name="status" label={t('field.status')}>
-                    <Select disabled={isCompleted} options={statusOptions} getPopupContainer={() => document.body} data-tour-id="drawer-status" />
+                    <Select disabled={isFinalized} options={statusOptions} getPopupContainer={() => document.body} data-tour-id="drawer-status" />
                   </Form.Item>
                 </>
               )}
 
               <Space wrap>
-                {!isCompleted && <Button type="primary" onClick={onFinish} loading={saving} disabled={archiving || deleting} data-tour-id="drawer-save">{t('btn.save')}</Button>}
-                {!editMode && !isCompleted && <Button onClick={handleEnterEdit} disabled={saving || archiving || deleting} data-tour-id="drawer-edit">{t('btn.edit')}</Button>}
-                {editMode && !isCompleted && <Button onClick={handleCancelEdit} disabled={saving || archiving || deleting} data-tour-id="drawer-cancel-edit">{t('btn.cancelEdit')}</Button>}
+                {!isFinalized && <Button type="primary" onClick={onFinish} loading={saving} disabled={archiving || deleting} data-tour-id="drawer-save">{t('btn.save')}</Button>}
+                {!editMode && !isFinalized && <Button onClick={handleEnterEdit} disabled={saving || archiving || deleting} data-tour-id="drawer-edit">{t('btn.edit')}</Button>}
+                {editMode && !isFinalized && <Button onClick={handleCancelEdit} disabled={saving || archiving || deleting} data-tour-id="drawer-cancel-edit">{t('btn.cancelEdit')}</Button>}
                 <Button onClick={onClose} data-tour-id="drawer-close">{t('btn.close')}</Button>
                 <Button icon={<InboxOutlined />} onClick={handleArchive} loading={archiving} disabled={saving || deleting} data-tour-id="drawer-archive">{project.archived ? t('btn.unarchive') : t('btn.archive')}</Button>
                 <Popconfirm title={t('modal.delete.confirm')} okText={t('modal.delete.ok') || 'OK'} cancelText={t('modal.delete.cancel') || 'Cancel'} onConfirm={handleDeleteConfirm} okButtonProps={{ 'data-testid': 'confirm-delete' }}>
@@ -210,7 +213,7 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
                               type="text"
                               icon={<DeleteOutlined style={{ fontSize: 18 }} />}
                               onClick={(e) => { e.stopPropagation(); onDeletePhoto?.(deleteRef) }}
-                              disabled={isCompleted}
+                              disabled={isFinalized}
                             />
                           </div>
                         </div>
@@ -222,10 +225,10 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
               <Upload
                 accept="image/*"
                 showUploadList={false}
-                disabled={isCompleted || uploading}
+                disabled={isFinalized || uploading}
                 beforeUpload={beforeUploadCheck}
               >
-                <Button icon={<UploadOutlined />} disabled={isCompleted} loading={uploading} data-tour-id="drawer-upload">{t('btn.uploadPhoto')}</Button>
+                <Button icon={<UploadOutlined />} disabled={isFinalized} loading={uploading} data-tour-id="drawer-upload">{t('btn.uploadPhoto')}</Button>
               </Upload>
             </div>
           </Space>
