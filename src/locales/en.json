@@ -193,5 +193,16 @@
   "tour.drawer.close.desc": "Close the panel and return to the list.",
 
   "common.yes": "Yes",
-  "common.no": "No"
+  "common.no": "No",
+  "label.location": "Location",
+  "location.auckland": "Auckland",
+  "location.wellington": "Wellington",
+  "location.christchurch": "Christchurch",
+  "label.weatherSignals": "Weather Signals",
+  "weather.signal.probability": "Precip Probability",
+  "weather.signal.rainfall": "Rainfall",
+  "weather.signal.temperature": "Avg Temp",
+  "weather.label.probabilityShort": "P",
+  "weather.label.rainfallShort": "R",
+  "weather.label.temperatureShort": "T"
 }

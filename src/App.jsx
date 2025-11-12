@@ -38,6 +38,8 @@ function AppContent() {
   const [tourOpen, setTourOpen] = React.useState(false)
   const [projectLoading, setProjectLoading] = React.useState(false)
   const [seedLoading, setSeedLoading] = React.useState(false)
+  const [location, setLocation] = React.useState('auckland')
+  const [weatherTypes, setWeatherTypes] = React.useState(['prob','rain'])
 
   // Normalize legacy modes to show in UI as backend-test
   const toDisplayMode = React.useCallback((m) => (m === 'backend' || m === 'backend-dev') ? 'backend-test' : m, [])
@@ -453,22 +455,28 @@ function AppContent() {
         onStartTour={() => setTourOpen(true)}
         exportExcelLoading={exportExcelLoading}
         seedLoading={seedLoading}
+        location={location}
+        onLocationChange={setLocation}
+        weatherTypes={weatherTypes}
+        onWeatherTypesChange={setWeatherTypes}
       />
 
-      <div className="container mx-auto p-3 sm:p-4 flex flex-col gap-4">
-        <div data-tour-id="calendar-view">
-          <CalendarView projects={projects} onEventClick={onOpenProject} />
+      <> {/* wrapping original return */}
+        {/* Calendar and table */}
+        <div className="p-3 sm:p-4 space-y-3">
+          <div data-tour-id="calendar-view">
+            <CalendarView projects={projects} onEventClick={onOpenProject} location={location} weatherTypes={weatherTypes} />
+          </div>
+          <div className="bg-white rounded border p-3" data-tour-id="project-table">
+            <ProjectTable
+              projects={projects}
+              loading={loading}
+              onRowClick={onOpenProject}
+              pagination={{ page, pageSize, total, onChange: onPageChange }}
+            />
+          </div>
         </div>
-        <div className="bg-white rounded border p-3" data-tour-id="project-table">
-          <ProjectTable
-            projects={projects}
-            loading={loading}
-            onRowClick={onOpenProject}
-            pagination={{ page, pageSize, total, onChange: onPageChange }}
-          />
-        </div>
-      </div>
-
+      </>
       <ProjectDrawer
         open={selectedId != null}
         project={selectedProject}

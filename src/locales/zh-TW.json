@@ -188,5 +188,16 @@
   "common.yes": "是",
   "common.no": "否",
   "help.glassOrdered": "勾選表示已向供應商下單",
-  "help.glassManufactured": "勾選表示生產完成並可安裝"
+  "help.glassManufactured": "勾選表示生產完成並可安裝",
+  "label.location": "地點",
+  "location.auckland": "奧克蘭",
+  "location.wellington": "威靈頓",
+  "location.christchurch": "基督城",
+  "label.weatherSignals": "天氣顯示",
+  "weather.signal.probability": "降水機率",
+  "weather.signal.rainfall": "降雨量",
+  "weather.signal.temperature": "平均氣溫",
+  "weather.label.probabilityShort": "機率",
+  "weather.label.rainfallShort": "雨量",
+  "weather.label.temperatureShort": "氣溫"
 }

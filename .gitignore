@@ -1,4 +1,7 @@
-!/node_modules/
-!/dist/
-!/.idea/
-/node_modules/
+# Ignore dependencies and IDE settings
+node_modules/
+.idea/
+
+# (Keep dist tracked intentionally; add more ignores below if needed)
+# OS artifacts
+.DS_Store

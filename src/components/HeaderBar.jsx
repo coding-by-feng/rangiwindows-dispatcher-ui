@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 const { Title } = Typography
 
-export default function HeaderBar({ onSearch, onAdd, onExportExcel, status, onStatusChange, includeArchived = false, onToggleIncludeArchived, mode, onModeChange, onSeedDemo, lang, onLangChange, exportExcelLoading = false, onStartTour, seedLoading = false }) {
+export default function HeaderBar({ onSearch, onAdd, onExportExcel, status, onStatusChange, includeArchived = false, onToggleIncludeArchived, mode, onModeChange, onSeedDemo, lang, onLangChange, exportExcelLoading = false, onStartTour, seedLoading = false, location, onLocationChange, weatherTypes = [], onWeatherTypesChange }) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = React.useState(true)
 
@@ -19,6 +19,34 @@ export default function HeaderBar({ onSearch, onAdd, onExportExcel, status, onSt
 
       {/* Row 2: All controls and buttons */}
       <div className="mt-2 flex flex-wrap items-center gap-2 sm:gap-3">
+        {/* Location */}
+        <Select
+          className="w-36 sm:w-40"
+          value={location}
+          onChange={onLocationChange}
+          data-tour-id="location-select"
+          options={[
+            { label: t('location.auckland'), value: 'auckland' },
+            { label: t('location.wellington'), value: 'wellington' },
+            { label: t('location.christchurch'), value: 'christchurch' },
+          ]}
+        />
+        {/* Weather Signals */}
+        <Select
+          mode="multiple"
+          maxTagCount={2}
+          allowClear
+          className="w-48 sm:w-52"
+          value={weatherTypes}
+          onChange={onWeatherTypesChange}
+          placeholder={t('label.weatherSignals')}
+          data-tour-id="weather-types-select"
+          options={[
+            { label: t('weather.signal.probability'), value: 'prob' },
+            { label: t('weather.signal.rainfall'), value: 'rain' },
+            { label: t('weather.signal.temperature'), value: 'temp' },
+          ]}
+        />
         {/* Mode + Lang */}
         <Select
           className="w-40 sm:w-44"
