@@ -346,6 +346,8 @@ export async function createProject(values) {
     archived: false,
     created_at: dayjs().toISOString(),
     change_note: values.change_note || '',
+    // Support multiple photos in local mode
+    photos: [],
   }
   saveLocal([...list, project])
   return project
@@ -391,17 +393,25 @@ export async function uploadPhoto(id, file) {
   const idx = list.findIndex(p => String(p.id) === String(id))
   if (idx === -1) throw new Error('Project not found')
   const dataUrl = await fileToDataUrl(file)
-  list[idx] = { ...list[idx], photo_url: dataUrl }
+  const p = list[idx]
+  const photos = Array.isArray(p.photos) ? [...p.photos] : []
+  const newId = `local-${(photos.reduce((m, x) => Math.max(m, Number(String(x.id).replace('local-', '')) || 0), 0) + 1)}`
+  const createdAt = dayjs().toISOString()
+  photos.push({ id: newId, token: newId, src: dataUrl, createdAt, contentType: file?.type || 'image/jpeg', size: file?.size || 0 })
+  list[idx] = { ...p, photo_url: dataUrl, photos }
   saveLocal(list)
   return list[idx]
 }
 
 export async function listProjectPhotos(id) {
   if (usingBackend()) return listProjectPhotosBackend(id)
-  // Local fallback: synthesize from photo_url if present
+  // Local fallback: use photos array if present; otherwise synthesize from photo_url
   const p = await getProject(id)
+  if (Array.isArray(p?.photos) && p.photos.length) {
+    return p.photos.map(ph => ({ id: ph.id, projectId: String(id), dfsFileId: ph.id, token: ph.token || ph.id, contentType: ph.contentType || 'image/jpeg', size: ph.size || 0, sortOrder: 0, caption: '', createdAt: ph.createdAt, src: ph.src }))
+  }
   if (p?.photo_url) {
-    return [{ id: 'local-1', projectId: String(id), dfsFileId: 'local/photo', token: 'local', contentType: 'image/jpeg', size: 0, sortOrder: 0, caption: '', createdAt: p.created_at }]
+    return [{ id: 'local-1', projectId: String(id), dfsFileId: 'local/photo', token: 'local', contentType: 'image/jpeg', size: 0, sortOrder: 0, caption: '', createdAt: p.created_at, src: p.photo_url }]
   }
   return []
 }
@@ -416,28 +426,37 @@ export async function deleteProjectPhoto(id, ref) {
     // Otherwise assume it's photoId
     return deleteProjectPhotoBackend(id, ref)
   }
-  // Local: clear photo_url
+  // Local: remove from photos by id or token; fallback to clearing photo_url
   const list = loadLocal()
   const idx = list.findIndex(p => String(p.id) === String(id))
   if (idx === -1) return false
-  list[idx] = { ...list[idx], photo_url: '' }
+  const p = list[idx]
+  let photos = Array.isArray(p.photos) ? [...p.photos] : []
+  if (typeof ref === 'string' && ref.startsWith('token:')) {
+    const token = ref.slice('token:'.length)
+    photos = photos.filter(ph => String(ph.token || ph.id) !== String(token))
+  } else {
+    photos = photos.filter(ph => String(ph.id) !== String(ref))
+  }
+  list[idx] = { ...p, photos, photo_url: photos.length ? (photos[photos.length - 1]?.src || '') : '' }
   saveLocal(list)
   return true
 }
 
 export async function deleteProjectPhotoByToken(id, token) {
   if (usingBackend()) return deleteProjectPhotoByTokenBackend(id, token)
-  // Local fallback same as delete by id: clear single photo
-  return deleteProjectPhoto(id, 'local-1')
+  // Local: remove by token
+  return deleteProjectPhoto(id, `token:${token}`)
 }
 
 export async function deleteAllProjectPhotos(id) {
   if (usingBackend()) return deleteAllProjectPhotosBackend(id)
-  // Local: clear photo_url
+  // Local: clear photos and photo_url
   const list = loadLocal()
   const idx = list.findIndex(p => String(p.id) === String(id))
   if (idx === -1) return false
-  list[idx] = { ...list[idx], photo_url: '' }
+  const p = list[idx]
+  list[idx] = { ...p, photos: [], photo_url: '' }
   saveLocal(list)
   return true
 }
@@ -447,8 +466,65 @@ export function getPhotoDownloadUrl(projectId, token) {
   return `${base}/rangi_windows/api/projects/${projectId}/photo/${token}`
 }
 
-async function getLocalByRange(start, end) { return loadLocal().filter(p => inRange(p, start, end)) }
+// Simple global queue to serialize downloads across the app
+let __downloadQueue = Promise.resolve()
 
+// Download a project photo to user's machine.
+export async function downloadProjectPhoto(projectId, token, fallbackName = 'photo.jpg') {
+  const runDownload = async () => {
+    if (usingBackend()) {
+      const name = fallbackName || `photo_${projectId}_${token}.bin`
+      const maxAttempts = 5
+      const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+      let lastErr
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const res = await client().get(`/rangi_windows/api/projects/${projectId}/photo/${token}`, { responseType: 'blob' })
+          const blob = new Blob([res.data])
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          const cdName = filenameFromHeaders(res.headers, name)
+          a.download = cdName || name
+          document.body.appendChild(a)
+          a.click()
+          a.remove()
+          URL.revokeObjectURL(url)
+          return
+        } catch (e) {
+          lastErr = e
+          if (attempt < maxAttempts) await sleep(250 * attempt)
+        }
+      }
+      throw lastErr || new Error('Download failed')
+    }
+    // Local mode: find photo and download from data URL
+    try {
+      const list = JSON.parse(localStorage.getItem('rw_projects') || '[]')
+      const p = list.find(p => String(p.id) === String(projectId))
+      let src = ''
+      if (p && Array.isArray(p.photos) && p.photos.length) {
+        const ph = p.photos.find(ph => String(ph.token || ph.id) === String(token))
+        src = ph?.src || ''
+      }
+      if (!src && p?.photo_url) src = p.photo_url
+      if (!src) return
+      const a = document.createElement('a')
+      a.href = src
+      a.download = fallbackName || `photo_${projectId}_${token}.jpg`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    } catch {}
+  }
+
+  // Enqueue to ensure one-at-a-time; keep queue alive even if a task fails
+  const task = __downloadQueue.then(runDownload, runDownload)
+  __downloadQueue = task.catch(() => {})
+  return task
+}
+
+// ---------------- Excel export (backend + local) ----------------
 export async function exportExcel({ start, end, archived, includeArchived }) {
   if (usingBackend()) return exportExcelBackend({ start, end, archived, includeArchived })
   const rows = await getLocalByRange(start, end)
@@ -521,6 +597,7 @@ export async function seedAucklandDemos(min = 10) {
       photo_url: '',
       archived: false,
       created_at: dayjs().toISOString(),
+      photos: [],
     }
 
     list.push(project)

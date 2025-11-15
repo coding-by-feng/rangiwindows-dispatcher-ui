@@ -204,5 +204,6 @@
   "weather.signal.temperature": "Avg Temp",
   "weather.label.probabilityShort": "P",
   "weather.label.rainfallShort": "R",
-  "weather.label.temperatureShort": "T"
+  "weather.label.temperatureShort": "T",
+  "warn.compressingImage": "Image is large, compressing..."
 }

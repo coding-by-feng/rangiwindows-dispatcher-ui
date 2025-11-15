@@ -199,5 +199,6 @@
   "weather.signal.temperature": "平均氣溫",
   "weather.label.probabilityShort": "機率",
   "weather.label.rainfallShort": "雨量",
-  "weather.label.temperatureShort": "氣溫"
+  "weather.label.temperatureShort": "氣溫",
+  "warn.compressingImage": "圖片過大，正在壓縮…"
 }

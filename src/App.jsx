@@ -40,6 +40,7 @@ function AppContent() {
   const [seedLoading, setSeedLoading] = React.useState(false)
   const [location, setLocation] = React.useState('auckland')
   const [weatherTypes, setWeatherTypes] = React.useState(['prob','rain'])
+  const [uploadTasks, setUploadTasks] = React.useState([])
 
   // Normalize legacy modes to show in UI as backend-test
   const toDisplayMode = React.useCallback((m) => (m === 'backend' || m === 'backend-dev') ? 'backend-test' : m, [])
@@ -165,6 +166,8 @@ function AppContent() {
   const onUploadPhoto = async (file) => {
     if (!selectedId) return
     const key = 'uploading'
+    // initialize single-task status list
+    setUploadTasks([{ id: `${Date.now()}-0`, name: file?.name || 'file', size: file?.size || 0, type: file?.type || '', status: 'uploading', attempts: 0 }])
     setUploadLoading(true)
     message.open({ type: 'loading', content: t('loading.uploading'), key })
     try {
@@ -173,13 +176,73 @@ function AppContent() {
         const photos = await listProjectPhotos(selectedId)
         setSelectedPhotos(Array.isArray(photos) ? photos : [])
       } catch {}
+      setUploadTasks(prev => prev.map((it, idx) => idx === 0 ? { ...it, status: 'success', attempts: Math.max(1, it.attempts || 1) } : it))
       message.open({ type: 'success', content: t('toast.photoUploaded'), key, duration: 2 })
     } catch (e) {
       const msg = e?.response?.data?.message || e?.message || 'Request failed'
+      setUploadTasks(prev => prev.map((it, idx) => idx === 0 ? { ...it, status: 'failed', error: msg, attempts: (it.attempts || 0) + 1 } : it))
       message.open({ type: 'error', content: t('err.uploadFailed', { msg }), key, duration: 3 })
     } finally {
       setUploadLoading(false)
     }
+  }
+
+  // New: multi-file sequential upload with up to 3 retries per file
+  const onUploadMany = async (files) => {
+    if (!selectedId || !Array.isArray(files) || files.length === 0) return
+    const key = 'uploading-many'
+    // seed tasks list in order
+    setUploadTasks(files.map((f, i) => ({ id: `${Date.now()}-${i}`, name: f?.name || `file-${i+1}` , size: f?.size || 0, type: f?.type || '', status: 'queued', attempts: 0 })))
+    setUploadLoading(true)
+    message.open({ type: 'loading', content: t('loading.uploading'), key })
+
+    const maxRetries = 3
+    const failed = []
+
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+    const tryOnce = async (file, idx) => {
+      let attempt = 0
+      setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, status: 'uploading' } : it))
+      while (attempt < maxRetries) {
+        try {
+          await uploadPhoto(selectedId, file)
+          setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, status: 'success', attempts: attempt + 1 } : it))
+          return true
+        } catch (e) {
+          attempt += 1
+          setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, status: 'uploading', attempts: attempt } : it))
+          if (attempt >= maxRetries) {
+            const msg = e?.response?.data?.message || e?.message || 'Upload failed'
+            setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, status: 'failed', error: msg, attempts: attempt } : it))
+            return e
+          }
+          await sleep(250 * attempt)
+        }
+      }
+      return new Error('unknown')
+    }
+
+    for (let i = 0; i < files.length; i++) {
+      const res = await tryOnce(files[i], i)
+      if (res !== true) failed.push({ file: files[i], error: res })
+    }
+
+    try {
+      const photos = await listProjectPhotos(selectedId)
+      setSelectedPhotos(Array.isArray(photos) ? photos : [])
+    } catch {}
+
+    if (failed.length === 0) {
+      message.open({ type: 'success', content: t('toast.photoUploaded'), key, duration: 2 })
+    } else if (failed.length === files.length) {
+      const msg = failed[0]?.error?.response?.data?.message || failed[0]?.error?.message || 'Upload failed'
+      message.open({ type: 'error', content: t('err.uploadFailed', { msg }), key, duration: 3 })
+    } else {
+      const msg = `${failed.length}/${files.length} failed`
+      message.open({ type: 'warning', content: t('err.uploadFailed', { msg }), key, duration: 3 })
+    }
+
+    setUploadLoading(false)
   }
 
   const onDeletePhoto = async (photoRef) => {
@@ -481,9 +544,10 @@ function AppContent() {
         open={selectedId != null}
         project={selectedProject}
         photos={selectedPhotos}
-        onClose={() => { setSelectedProject(null); setSelectedId(null); setSelectedPhotos([]); setProjectLoading(false) }}
+        onClose={() => { setSelectedProject(null); setSelectedId(null); setSelectedPhotos([]); setProjectLoading(false); setUploadTasks([]) }}
         onSave={onSaveProject}
         onUpload={onUploadPhoto}
+        onUploadMany={onUploadMany}
         onDeletePhoto={onDeletePhoto}
         onDeleteAllPhotos={onDeleteAllPhotos}
         onArchive={onArchive}
@@ -492,6 +556,8 @@ function AppContent() {
         archiving={archiveLoading}
         deleting={deleteLoading}
         uploading={uploadLoading}
+        uploadTasks={uploadTasks}
+        onClearUploadTasks={() => setUploadTasks([])}
         loading={projectLoading}
       />
 

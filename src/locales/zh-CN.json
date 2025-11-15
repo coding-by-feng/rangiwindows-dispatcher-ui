@@ -205,5 +205,6 @@
   "weather.signal.temperature": "平均气温",
   "weather.label.probabilityShort": "概率",
   "weather.label.rainfallShort": "雨量",
-  "weather.label.temperatureShort": "气温"
+  "weather.label.temperatureShort": "气温",
+  "warn.compressingImage": "图片过大，正在压缩…"
 }
