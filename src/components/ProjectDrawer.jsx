@@ -7,12 +7,17 @@ import { getPhotoDownloadUrl, downloadProjectPhoto } from '../api'
 import { normalizeStatus } from '../utils/status'
 import ProjectFormFields from './ProjectFormFields'
 
-// Simple media with retry: directly load image/video; on error, retry up to 5 times with cache-busting
+// Simple media with retry: now manual click retries (max 5). On error shows clickable overlay; waits 0.5s before reload.
 function MediaWithRetry({ item, height = 160 }) {
   const MAX_ATTEMPTS = 5
-  const [attempt, setAttempt] = React.useState(0)
+  const [attempt, setAttempt] = React.useState(0) // manual attempts performed
+  const [curSrc, setCurSrc] = React.useState(item.src)
   const [loaded, setLoaded] = React.useState(false)
   const [failed, setFailed] = React.useState(false)
+  const [waiting, setWaiting] = React.useState(false)
+  const waitTimerRef = React.useRef(null)
+
+  const isVideo = (item.contentType || '').startsWith('video/')
 
   const addCacheBust = React.useCallback((s, a) => {
     try {
@@ -23,32 +28,88 @@ function MediaWithRetry({ item, height = 160 }) {
     } catch { return s }
   }, [])
 
-  const curSrc = React.useMemo(() => {
-    if (attempt === 0) return item.src
-    return addCacheBust(item.src, attempt)
-  }, [item.src, attempt, addCacheBust])
-
-  const isVideo = (item.contentType || '').startsWith('video/')
-
-  const onError = React.useCallback(() => {
-    if (attempt >= MAX_ATTEMPTS) {
-      setFailed(true)
-      return
-    }
-    setAttempt(a => a + 1)
+  React.useEffect(() => {
+    // Reset if item changes
+    setAttempt(0)
+    setCurSrc(item.src)
     setLoaded(false)
-  }, [attempt])
+    setFailed(false)
+    setWaiting(false)
+    if (waitTimerRef.current) { clearTimeout(waitTimerRef.current); waitTimerRef.current = null }
+  }, [item.src])
 
-  const commonOverlay = (!loaded && !failed) ? (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9' }}>
-      <Spin size="small" />
-    </div>
-  ) : failed ? (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fee2e2', color: '#b91c1c', fontSize: 12 }}>
-      <span>{item.alt || (isVideo ? 'video' : 'image')}</span>
-      <span>Load failed</span>
-    </div>
-  ) : null
+  const cleanupTimer = React.useCallback(() => {
+    if (waitTimerRef.current) { clearTimeout(waitTimerRef.current); waitTimerRef.current = null }
+  }, [])
+
+  React.useEffect(() => () => cleanupTimer(), [cleanupTimer])
+
+  const handleLoaded = React.useCallback(() => {
+    setLoaded(true)
+    setFailed(false)
+  }, [])
+
+  const handleError = React.useCallback(() => {
+    setLoaded(false)
+    setFailed(true)
+  }, [])
+
+  const handleManualRetry = React.useCallback(() => {
+    if (waiting) return
+    if (attempt >= MAX_ATTEMPTS) return
+    // Prepare next attempt
+    setWaiting(true)
+    cleanupTimer()
+    waitTimerRef.current = setTimeout(() => {
+      waitTimerRef.current = null
+      const next = attempt + 1
+      setAttempt(next)
+      setFailed(false)
+      setLoaded(false)
+      setCurSrc(addCacheBust(item.src, next))
+      setWaiting(false)
+    }, 500)
+  }, [attempt, waiting, item.src, addCacheBust, cleanupTimer])
+
+  const showAttemptBadge = attempt > 0 && !failed && !waiting && !loaded
+
+  const commonOverlay = (() => {
+    if (waiting) {
+      return (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9' }}>
+          <Spin size="small" />
+          <span style={{ fontSize: 11, marginTop: 4 }}>Retrying...</span>
+        </div>
+      )
+    }
+    if (!loaded && !failed) {
+      return (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9' }}>
+          <Spin size="small" />
+        </div>
+      )
+    }
+    if (failed) {
+      const noMore = attempt >= MAX_ATTEMPTS
+      const hint = noMore
+        ? 'Load failed (max retries)'
+        : (attempt === 0
+            ? 'Load failed – click to reload'
+            : `Load failed – click to reload (${attempt}/${MAX_ATTEMPTS})`)
+      return (
+        <div
+          role={!noMore ? 'button' : undefined}
+          aria-label={!noMore ? 'Retry loading media' : 'Load failed'}
+          onClick={!noMore ? handleManualRetry : undefined}
+          style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fee2e2', color: '#b91c1c', fontSize: 12, cursor: noMore ? 'not-allowed' : 'pointer', textAlign: 'center', padding: '0 6px', lineHeight: 1.3 }}
+        >
+          <span style={{ fontWeight: 500 }}>{item.alt || (isVideo ? 'video' : 'image')}</span>
+          <span style={{ marginTop: 4 }}>{hint}</span>
+        </div>
+      )
+    }
+    return null
+  })()
 
   return (
     <div style={{ position: 'relative', width: '100%', height, overflow: 'hidden' }}>
@@ -56,24 +117,24 @@ function MediaWithRetry({ item, height = 160 }) {
         <Image
           src={curSrc}
           alt={item.alt}
-          preview
-          onLoad={() => setLoaded(true)}
-          onError={onError}
+          preview={!failed}
+          onLoad={handleLoaded}
+          onError={handleError}
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: loaded && !failed ? 'block' : 'none' }}
         />
       ) : (
         <video
           src={curSrc}
-          onCanPlayThrough={() => setLoaded(true)}
-          onLoadedData={() => setLoaded(true)}
-          onError={onError}
-          controls
+          onCanPlayThrough={handleLoaded}
+          onLoadedData={handleLoaded}
+          onError={handleError}
+          controls={!failed}
           muted
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: loaded && !failed ? 'block' : 'none', background: '#000' }}
         />
       )}
       {commonOverlay}
-      {attempt > 0 && !failed && (
+      {showAttemptBadge && (
         <div className="absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1 rounded">Attempt {attempt}</div>
       )}
     </div>
@@ -188,51 +249,8 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
 
   // Upload helpers
   const MB = 1024 * 1024
-  const MAX_IMAGE_MB = 5
-  const MAX_VIDEO_MB = 50
 
-  const dataUrlFromFile = (file) => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file) })
-
-  async function compressImageFile(file, targetBytes = MAX_IMAGE_MB * MB) {
-    try {
-      const srcUrl = await dataUrlFromFile(file)
-      const img = await new Promise((resolve, reject) => { const i = new window.Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = srcUrl })
-      const maxW = 1920, maxH = 1920
-      let { width, height } = img
-      const ratio = Math.min(1, maxW / width, maxH / height)
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.max(1, Math.round(width * ratio))
-      canvas.height = Math.max(1, Math.round(height * ratio))
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      let quality = 0.92
-      let blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality))
-      while (blob && blob.size > targetBytes && quality > 0.5) {
-        quality -= 0.07
-        blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', Math.max(quality, 0.5)))
-      }
-      if (!blob) return file
-      if (blob.size > targetBytes) {
-        const factor = 0.85
-        const c2 = document.createElement('canvas')
-        c2.width = Math.max(1, Math.round(canvas.width * factor))
-        c2.height = Math.max(1, Math.round(canvas.height * factor))
-        const ctx2 = c2.getContext('2d')
-        ctx2.drawImage(canvas, 0, 0, c2.width, c2.height)
-        let q = Math.max(quality, 0.5)
-        blob = await new Promise(resolve => c2.toBlob(resolve, 'image/jpeg', q))
-        if (blob && blob.size > targetBytes) {
-          q = Math.max(0.4, q - 0.1)
-          blob = await new Promise(resolve => c2.toBlob(resolve, 'image/jpeg', q))
-        }
-      }
-      if (!blob) return file
-      return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg', lastModified: Date.now() })
-    } catch {
-      return file
-    }
-  }
-
+  // Simplified: just validate types; compression handled upstream
   const preprocessFiles = async (files) => {
     const processed = []
     for (const f of files) {
@@ -243,25 +261,7 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
         message?.warning(t('err.uploadFailed', { msg: 'Only images or videos are allowed' }))
         continue
       }
-      if (isVideo) {
-        if (typeof f.size === 'number' && f.size > MAX_VIDEO_MB * MB) {
-          message?.warning(t('err.uploadFailed', { msg: `Video is over ${MAX_VIDEO_MB}MB and was skipped` }))
-          continue
-        }
-        processed.push(f)
-        continue
-      }
-      if (typeof f.size === 'number' && f.size > MAX_IMAGE_MB * MB) {
-        message?.warning(t('warn.compressingImage') || 'Image is large, compressing...')
-        const c = await compressImageFile(f, MAX_IMAGE_MB * MB)
-        if (c.size > MAX_IMAGE_MB * MB) {
-          message?.warning(t('err.uploadFailed', { msg: `Image remains over ${MAX_IMAGE_MB}MB after compression and was skipped` }))
-          continue
-        }
-        processed.push(c)
-      } else {
-        processed.push(f)
-      }
+      processed.push(f)
     }
     return processed
   }
@@ -420,9 +420,12 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
                       const status = it.status
                       let icon = <ClockCircleTwoTone twoToneColor="#A3A3A3" />
                       if (status === 'uploading') icon = <LoadingOutlined />
+                      else if (status === 'compressing') icon = <LoadingOutlined />
                       else if (status === 'success') icon = <CheckCircleTwoTone twoToneColor="#22C55E" />
                       else if (status === 'failed') icon = <CloseCircleTwoTone twoToneColor="#EF4444" />
                       const sizeKB = it.size ? Math.round(it.size / 1024) : 0
+                      const comp = typeof it.compressPct === 'number' ? it.compressPct : null
+                      const upl = typeof it.uploadPct === 'number' ? it.uploadPct : null
                       return (
                         <List.Item style={{ padding: '2px 0' }}>
                           <Space size={6}>
@@ -431,6 +434,13 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
                               <Typography.Text style={{ maxWidth: 180 }} ellipsis>{it.name}</Typography.Text>
                             </Tooltip>
                             <Typography.Text type="secondary">{sizeKB}KB</Typography.Text>
+                            {(comp != null || upl != null) && (
+                              <Typography.Text type="secondary">
+                                {comp != null ? `C ${Math.min(100, Math.max(0, Math.round(comp)))}%` : ''}
+                                {comp != null && upl != null ? ' · ' : ''}
+                                {upl != null ? `U ${Math.min(100, Math.max(0, Math.round(upl)))}%` : ''}
+                              </Typography.Text>
+                            )}
                             {typeof it.attempts === 'number' && it.attempts > 0 && (
                               <Typography.Text type="secondary">x{it.attempts}</Typography.Text>
                             )}

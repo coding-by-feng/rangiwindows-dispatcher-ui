@@ -267,10 +267,20 @@ async function deleteProjectBackend(id) {
   await client().delete(`/rangi_windows/api/projects/${id}`)
   return true
 }
-async function uploadPhotoBackend(id, file) {
+async function uploadPhotoBackend(id, file, opts = {}) {
   const fd = new FormData()
   fd.append('file', file)
-  const { data } = await client().post(`/rangi_windows/api/projects/${id}/photo`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+  const { data } = await client().post(`/rangi_windows/api/projects/${id}/photo`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (evt) => {
+      try {
+        const total = evt.total || file.size || 1
+        const loaded = evt.loaded || 0
+        const pct = Math.min(100, Math.round((loaded / total) * 100))
+        opts.onProgress?.(pct, loaded, total)
+      } catch {}
+    }
+  })
   return data
 }
 async function listProjectPhotosBackend(id) {
@@ -387,11 +397,22 @@ export async function deleteProject(id) {
 
 function fileToDataUrl(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file) }) }
 
-export async function uploadPhoto(id, file) {
-  if (usingBackend()) return uploadPhotoBackend(id, file)
+export async function uploadPhoto(id, file, opts = {}) {
+  if (usingBackend()) return uploadPhotoBackend(id, file, opts)
   const list = loadLocal()
   const idx = list.findIndex(p => String(p.id) === String(id))
   if (idx === -1) throw new Error('Project not found')
+
+  // Simulate upload progress locally
+  const total = file?.size || 1024
+  let loaded = 0
+  for (let i = 0; i < 10; i++) {
+    await new Promise(r => setTimeout(r, 50))
+    loaded = Math.min(total, Math.round(total * ((i + 1) / 10)))
+    const pct = Math.min(100, Math.round((loaded / total) * 100))
+    try { opts.onProgress?.(pct, loaded, total) } catch {}
+  }
+
   const dataUrl = await fileToDataUrl(file)
   const p = list[idx]
   const photos = Array.isArray(p.photos) ? [...p.photos] : []
@@ -400,7 +421,7 @@ export async function uploadPhoto(id, file) {
   photos.push({ id: newId, token: newId, src: dataUrl, createdAt, contentType: file?.type || 'image/jpeg', size: file?.size || 0 })
   list[idx] = { ...p, photo_url: dataUrl, photos }
   saveLocal(list)
-  return list[idx]
+  return { id: newId }
 }
 
 export async function listProjectPhotos(id) {

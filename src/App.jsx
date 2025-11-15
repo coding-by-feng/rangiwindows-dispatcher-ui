@@ -12,6 +12,7 @@ import { setAppLanguage, getAppLanguage } from './i18n'
 import zhCN from 'antd/es/locale/zh_CN'
 import enUS from 'antd/es/locale/en_US'
 import zhTW from 'antd/es/locale/zh_TW'
+import { compressImageWithProgress, compressVideoWithProgress } from './utils/compress'
 
 function AppContent() {
   const { message } = AntdApp.useApp()
@@ -166,17 +167,29 @@ function AppContent() {
   const onUploadPhoto = async (file) => {
     if (!selectedId) return
     const key = 'uploading'
-    // initialize single-task status list
-    setUploadTasks([{ id: `${Date.now()}-0`, name: file?.name || 'file', size: file?.size || 0, type: file?.type || '', status: 'uploading', attempts: 0 }])
+    // initialize single-task status list with progress fields
+    setUploadTasks([{ id: `${Date.now()}-0`, name: file?.name || 'file', size: file?.size || 0, type: file?.type || '', status: 'compressing', attempts: 0, compressPct: 0, uploadPct: 0 }])
     setUploadLoading(true)
     message.open({ type: 'loading', content: t('loading.uploading'), key })
     try {
-      await uploadPhoto(selectedId, file)
+      // Compress first
+      const type = file?.type || ''
+      const isImage = type.startsWith('image/')
+      const isVideo = type.startsWith('video/')
+      const targetImageBytes = 100 * 1024
+      const targetVideoBytes = 10 * 1024 * 1024
+      const onComp = (pct) => setUploadTasks(prev => prev.map((it, idx) => idx === 0 ? { ...it, compressPct: pct } : it))
+      let compressed = file
+      if (isImage) compressed = await compressImageWithProgress(file, targetImageBytes, onComp)
+      else if (isVideo) compressed = await compressVideoWithProgress(file, targetVideoBytes, onComp)
+      // Start upload
+      setUploadTasks(prev => prev.map((it, idx) => idx === 0 ? { ...it, status: 'uploading', size: compressed.size } : it))
+      await uploadPhoto(selectedId, compressed, { onProgress: (pct) => setUploadTasks(prev => prev.map((it, idx) => idx === 0 ? { ...it, uploadPct: pct } : it)) })
       try {
         const photos = await listProjectPhotos(selectedId)
         setSelectedPhotos(Array.isArray(photos) ? photos : [])
       } catch {}
-      setUploadTasks(prev => prev.map((it, idx) => idx === 0 ? { ...it, status: 'success', attempts: Math.max(1, it.attempts || 1) } : it))
+      setUploadTasks(prev => prev.map((it, idx) => idx === 0 ? { ...it, status: 'success', attempts: Math.max(1, it.attempts || 1), compressPct: 100, uploadPct: 100 } : it))
       message.open({ type: 'success', content: t('toast.photoUploaded'), key, duration: 2 })
     } catch (e) {
       const msg = e?.response?.data?.message || e?.message || 'Request failed'
@@ -191,22 +204,35 @@ function AppContent() {
   const onUploadMany = async (files) => {
     if (!selectedId || !Array.isArray(files) || files.length === 0) return
     const key = 'uploading-many'
-    // seed tasks list in order
-    setUploadTasks(files.map((f, i) => ({ id: `${Date.now()}-${i}`, name: f?.name || `file-${i+1}` , size: f?.size || 0, type: f?.type || '', status: 'queued', attempts: 0 })))
+    setUploadTasks(files.map((f, i) => ({ id: `${Date.now()}-${i}`, name: f?.name || `file-${i+1}` , size: f?.size || 0, type: f?.type || '', status: 'compressing', attempts: 0, compressPct: 0, uploadPct: 0 })))
     setUploadLoading(true)
     message.open({ type: 'loading', content: t('loading.uploading'), key })
 
     const maxRetries = 3
     const failed = []
 
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms))
     const tryOnce = async (file, idx) => {
       let attempt = 0
-      setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, status: 'uploading' } : it))
+      const type = file?.type || ''
+      const isImage = type.startsWith('image/')
+      const isVideo = type.startsWith('video/')
+      const targetImageBytes = 100 * 1024
+      const targetVideoBytes = 10 * 1024 * 1024
+
+      const onComp = (pct) => setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, compressPct: pct } : it))
+      // Compress once per file
+      let compressed = file
+      try {
+        if (isImage) compressed = await compressImageWithProgress(file, targetImageBytes, onComp)
+        else if (isVideo) compressed = await compressVideoWithProgress(file, targetVideoBytes, onComp)
+      } catch {}
+
+      setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, status: 'uploading', size: compressed.size } : it))
+
       while (attempt < maxRetries) {
         try {
-          await uploadPhoto(selectedId, file)
-          setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, status: 'success', attempts: attempt + 1 } : it))
+          await uploadPhoto(selectedId, compressed, { onProgress: (pct) => setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, uploadPct: pct } : it)) })
+          setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, status: 'success', attempts: attempt + 1, compressPct: 100, uploadPct: 100 } : it))
           return true
         } catch (e) {
           attempt += 1
@@ -216,7 +242,7 @@ function AppContent() {
             setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, status: 'failed', error: msg, attempts: attempt } : it))
             return e
           }
-          await sleep(250 * attempt)
+          await new Promise(r => setTimeout(r, 250 * attempt))
         }
       }
       return new Error('unknown')
