@@ -5,6 +5,7 @@
   "mode.backendProd": "Backend (Prod)",
   "search.placeholder": "Search project/client/address",
   "filter.status": "Status Filter",
+  "filter.stages": "Stage Status",
   "label.showArchived": "Show archived",
   "btn.exportExcel": "Export Excel",
   "btn.addProject": "New Project",
@@ -38,7 +39,7 @@
   "field.endDate": "End Date",
   "field.status": "Status",
   "field.todayTask": "Today's Task",
-  "field.progressNote": "Progress Note",
+  "field.progressNote": "Install & Delivery Notes",
   "field.teamMembers": "Team Members",
   "field.dateRange": "Date Range",
   "field.changeNote": "Change Note",
@@ -52,6 +53,20 @@
   "status.doors_windows_delivered": "Doors/Windows Delivered",
   "status.doors_windows_installed": "Doors/Windows Installed",
   "status.final_payment_received": "Final Payment Received",
+
+  "stage.glass": "Glass",
+  "stage.frame": "Frame",
+  "stage.purchase": "Purchase",
+  "stage.transport": "Transport",
+  "stage.install": "Install",
+  "stage.repair": "Repair",
+
+  "stageRemark.glass": "Glass Remark",
+  "stageRemark.frame": "Frame Remark",
+  "stageRemark.purchase": "Purchase Remark",
+  "stageRemark.transport": "Transport Remark",
+  "stageRemark.install": "Install Remark",
+  "stageRemark.repair": "Repair Remark",
 
   "modal.create.title": "Create Project",
   "modal.create.ok": "Create",
@@ -92,6 +107,7 @@
   "excel.filename": "Schedule_{{start}}_{{end}}.xlsx",
   "pdf.title": "Monthly Schedule",
   "pdf.filename": "Schedule_{{start}}_{{end}}.pdf",
+  "pdf.stageRemarks": "Stage Remarks",
 
   "lang.zh-CN": "简体中文",
   "lang.en": "English",
@@ -205,5 +221,15 @@
   "weather.label.probabilityShort": "P",
   "weather.label.rainfallShort": "R",
   "weather.label.temperatureShort": "T",
-  "warn.compressingImage": "Image is large, compressing..."
+  "warn.compressingImage": "Image is large, compressing...",
+  "label.compressMedia": "Compress images/videos",
+
+  "passcode.title": "Enter access passcode",
+  "passcode.desc": "To protect resources, please enter the 6-digit passcode provided by the administrator.",
+  "passcode.placeholder": "6 digits",
+  "passcode.submit": "Verify and enter",
+  "passcode.ok": "Verified",
+  "passcode.errorRequired": "Please enter a 6-digit passcode",
+  "passcode.errorInvalid": "Invalid passcode",
+  "passcode.hint": "This passcode is served by the Auth service and rotated via the Config Server."
 }

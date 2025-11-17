@@ -37,16 +37,17 @@ test.describe('API calls wiring', () => {
       id: nextId,
       project_code: 'P-201',
       name: 'API Test Project',
-      client_name: '张三', client_phone: '021-123456', address: '上海市',
+      client_name: '张三', address: '上海市',
       sales_person: 'Tim', installer: 'Peter', team_members: 'Peter, Jack',
       start_date: '2025-10-10', end_date: '2025-10-12', status: '施工中',
       today_task: '', progress_note: '', photo_url: '', archived: false,
       created_at: new Date().toISOString(),
+      stages: { glass: true, glassRemark: 'LOW-E' }
     }
     let current = { ...seedProject }
 
     // Intercept list
-    await page.route(`**://${host}/api/projects**`, async (route) => {
+    await page.route(`**://${host}/rangi_windows/api/projects**`, async (route) => {
       const req = route.request()
       if (req.method() === 'GET') {
         calls.list++
@@ -73,12 +74,12 @@ test.describe('API calls wiring', () => {
     })
 
     // Intercept photos list BEFORE generic project routes
-    await page.route(`**://${host}/api/projects/*/photos`, async (route) => {
+    await page.route(`**://${host}/rangi_windows/api/projects/*/photos`, async (route) => {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
     })
 
     // Intercept single get, update, archive, delete, photo upload
-    await page.route(`**://${host}/api/projects/*`, async (route) => {
+    await page.route(`**://${host}/rangi_windows/api/projects/*`, async (route) => {
       const req = route.request()
       const url = new URL(req.url())
       if (req.method() === 'GET') {
@@ -107,8 +108,8 @@ test.describe('API calls wiring', () => {
       return route.fallback()
     })
 
-    // Intercept export endpoints (moved to /api/export/*)
-    await page.route(`**://${host}/api/export/excel**`, async (route) => {
+    // Intercept export endpoints (moved to /rangi_windows/api/export/*)
+    await page.route(`**://${host}/rangi_windows/api/export/excel**`, async (route) => {
       calls.exportExcel++
       return route.fulfill({
         status: 200,
@@ -116,7 +117,7 @@ test.describe('API calls wiring', () => {
         body: 'excel-bytes',
       })
     })
-    await page.route(`**://${host}/api/export/pdf**`, async (route) => {
+    await page.route(`**://${host}/rangi_windows/api/export/pdf**`, async (route) => {
       calls.exportPDF++
       return route.fulfill({
         status: 200,
@@ -148,7 +149,6 @@ test.describe('API calls wiring', () => {
     await dlg.getByLabel('项目名称').fill('New Project')
     await dlg.getByLabel('地址').fill('Test Street 1')
     await dlg.getByLabel('客户姓名').fill('客户A')
-    await dlg.getByLabel('客户电话').fill('021-000000')
     await dlg.getByLabel('销售负责人').fill('Sales')
     await dlg.getByLabel('安装负责人').fill('Installer')
 
@@ -198,8 +198,8 @@ test.describe('API calls wiring', () => {
     await page.keyboard.press('Enter')
     expect(calls.list).toBeGreaterThan(1)
 
-    // Status filter triggers list again
-    await page.getByPlaceholder('状态筛选').click()
-    await page.getByRole('option', { name: '门窗已生产' }).click()
+    // Stage filter triggers list again
+    await page.getByRole('button', { name: /阶段状态/ }).click()
+    await page.getByText('安装阶段').click()
   })
 })

@@ -5,6 +5,7 @@
   "mode.backendProd": "後端（生產）",
   "search.placeholder": "搜尋專案/客戶/地址",
   "filter.status": "狀態篩選",
+  "filter.stages": "階段狀態",
   "label.showArchived": "顯示歸檔",
   "btn.exportExcel": "匯出Excel",
   "btn.addProject": "新增專案",
@@ -39,7 +40,7 @@
   "field.endDate": "結束日期",
   "field.status": "狀態",
   "field.todayTask": "今日任務",
-  "field.progressNote": "狀態備註",
+  "field.progressNote": "安裝及送貨備註",
   "field.teamMembers": "團隊成員",
   "field.dateRange": "施工日期",
   "photos.section": "現場照片",
@@ -200,5 +201,6 @@
   "weather.label.probabilityShort": "機率",
   "weather.label.rainfallShort": "雨量",
   "weather.label.temperatureShort": "氣溫",
-  "warn.compressingImage": "圖片過大，正在壓縮…"
+  "warn.compressingImage": "圖片過大，正在壓縮…",
+  "label.compressMedia": "上傳前壓縮圖片/影片"
 }

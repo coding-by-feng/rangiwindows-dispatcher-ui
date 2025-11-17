@@ -1,60 +1,148 @@
-import React from 'react'
-import { Table, Tag, Grid, Empty, Pagination } from 'antd'
+import React, { useEffect, useMemo, useState } from 'react'
+import { Table, Tag, Grid, Empty, Pagination, Popover, Checkbox, Button, Space, Divider, Tooltip } from 'antd'
+import { SettingOutlined, ClearOutlined, RedoOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
-import { normalizeStatus } from '../utils/status'
 
 export default function ProjectTable({ projects = [], loading, onRowClick, pagination }) {
   const screens = Grid.useBreakpoint()
   const isMobile = !screens.sm
   const { t } = useTranslation()
 
-  const statusColor = (codeRaw) => {
-    const code = normalizeStatus(codeRaw)
-    switch (code) {
-      case 'final_payment_received':
-        return 'green'
-      case 'doors_windows_installed':
-        return 'blue'
-      case 'doors_windows_delivered':
-        return 'cyan'
-      case 'doors_windows_produced':
-        return 'gold'
-      case 'glass_ordered':
-      default:
-        return 'default'
-    }
-  }
-  const statusText = (raw) => {
-    const code = normalizeStatus(raw)
-    const allowed = ['glass_ordered', 'doors_windows_produced', 'doors_windows_delivered', 'doors_windows_installed', 'final_payment_received']
-    if (allowed.includes(code)) return t(`status.${code}`)
-    return raw || '-'
+  // localStorage keys
+  const LS_COLUMNS_KEY = 'projectTable.columns.v2'
+  const LS_SORT_KEY = 'projectTable.sort.v2'
+
+  // all possible column keys in stable order
+  const allColumnKeys = useMemo(() => (
+    ['project_code', 'name', 'address', 'sales_person', 'installer', 'start_date', 'end_date', 'glass', 'frame', 'purchase', 'transport', 'install', 'repair']
+  ), [])
+
+  // default visible columns = all
+  const defaultVisible = allColumnKeys
+
+  const [visibleKeys, setVisibleKeys] = useState(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(LS_COLUMNS_KEY) : null
+      const parsed = raw ? JSON.parse(raw) : null
+      if (Array.isArray(parsed) && parsed.length) {
+        // keep only known keys to be safe
+        return parsed.filter(k => allColumnKeys.includes(k))
+      }
+    } catch (_) {}
+    return [...defaultVisible]
+  })
+
+  const [sortState, setSortState] = useState(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(LS_SORT_KEY) : null
+      const parsed = raw ? JSON.parse(raw) : null
+      if (parsed && (parsed.order === 'ascend' || parsed.order === 'descend') && allColumnKeys.includes(parsed.key)) {
+        return parsed
+      }
+    } catch (_) {}
+    return { key: null, order: null }
+  })
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LS_COLUMNS_KEY, JSON.stringify(visibleKeys))
+    } catch (_) {}
+  }, [visibleKeys])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LS_SORT_KEY, JSON.stringify(sortState))
+    } catch (_) {}
+  }, [sortState])
+
+  // common string sorter helper
+  const strSorter = (a, b, field) => String(a?.[field] || '').localeCompare(String(b?.[field] || ''))
+
+  const renderStage = (record, key, remarkKey) => {
+    const v = !!record?.stages?.[key]
+    const remark = record?.stages?.[remarkKey] || ''
+    const tag = <Tag color={v ? 'green' : 'default'}>{v ? t('common.yes') : t('common.no')}</Tag>
+    return remark ? (
+      <Tooltip title={remark}>{tag}</Tooltip>
+    ) : tag
   }
 
-  const columns = [
-    { title: t('field.projectCode'), dataIndex: 'project_code', key: 'project_code', fixed: 'left', sorter: (a, b) => String(a.project_code || '').localeCompare(String(b.project_code || '')), responsive: ['xs', 'sm', 'md', 'lg'] },
-    { title: t('field.project'), dataIndex: 'name', key: 'name', sorter: (a, b) => String(a.name || '').localeCompare(String(b.name || '')), responsive: ['xs', 'sm', 'md', 'lg'] },
-    { title: t('field.address'), dataIndex: 'address', key: 'address', ellipsis: true, responsive: ['sm', 'md', 'lg'] },
-    { title: t('field.salesPerson'), dataIndex: 'sales_person', key: 'sales_person', width: 120, responsive: ['md', 'lg'] },
-    { title: t('field.installer'), dataIndex: 'installer', key: 'installer', width: 120, responsive: ['md', 'lg'] },
+  // define full columns definition list
+  const allColumns = useMemo(() => ([
+    { title: t('field.projectCode'), dataIndex: 'project_code', key: 'project_code', fixed: 'left', sorter: (a, b) => strSorter(a, b, 'project_code'), responsive: ['xs', 'sm', 'md', 'lg'] },
+    { title: t('field.project'), dataIndex: 'name', key: 'name', sorter: (a, b) => strSorter(a, b, 'name'), responsive: ['xs', 'sm', 'md', 'lg'] },
+    { title: t('field.address'), dataIndex: 'address', key: 'address', ellipsis: true, sorter: (a, b) => strSorter(a, b, 'address'), responsive: ['sm', 'md', 'lg'] },
+    { title: t('field.salesPerson'), dataIndex: 'sales_person', key: 'sales_person', width: 120, sorter: (a, b) => strSorter(a, b, 'sales_person'), responsive: ['md', 'lg'] },
+    { title: t('field.installer'), dataIndex: 'installer', key: 'installer', width: 120, sorter: (a, b) => strSorter(a, b, 'installer'), responsive: ['md', 'lg'] },
     { title: t('field.startDate'), dataIndex: 'start_date', key: 'start_date', width: 120, sorter: (a, b) => new Date(a.start_date || 0) - new Date(b.start_date || 0), render: v => v ? dayjs(v).format('YYYY-MM-DD') : '', responsive: ['xs', 'sm', 'md', 'lg'] },
     { title: t('field.endDate'), dataIndex: 'end_date', key: 'end_date', width: 120, sorter: (a, b) => new Date(a.end_date || 0) - new Date(b.end_date || 0), render: v => v ? dayjs(v).format('YYYY-MM-DD') : '', responsive: ['sm', 'md', 'lg'] },
-    {
-      title: t('field.status'), dataIndex: 'status', key: 'status', width: 160, responsive: ['xs', 'sm', 'md', 'lg'],
-      filters: [
-        { text: t('status.glass_ordered'), value: 'glass_ordered' },
-        { text: t('status.doors_windows_produced'), value: 'doors_windows_produced' },
-        { text: t('status.doors_windows_delivered'), value: 'doors_windows_delivered' },
-        { text: t('status.doors_windows_installed'), value: 'doors_windows_installed' },
-        { text: t('status.final_payment_received'), value: 'final_payment_received' },
-      ],
-      onFilter: (val, record) => normalizeStatus(record.status) === val,
-      render: (v) => (
-        <Tag color={statusColor(v)}>{statusText(v)}</Tag>
-      )
-    },
-  ]
+    { title: t('stage.glass'), key: 'glass', dataIndex: 'stages', width: 90, render: (_, r) => renderStage(r, 'glass', 'glassRemark') },
+    { title: t('stage.frame'), key: 'frame', dataIndex: 'stages', width: 90, render: (_, r) => renderStage(r, 'frame', 'frameRemark') },
+    { title: t('stage.purchase'), key: 'purchase', dataIndex: 'stages', width: 90, render: (_, r) => renderStage(r, 'purchase', 'purchaseRemark') },
+    { title: t('stage.transport'), key: 'transport', dataIndex: 'stages', width: 90, render: (_, r) => renderStage(r, 'transport', 'transportRemark') },
+    { title: t('stage.install'), key: 'install', dataIndex: 'stages', width: 90, render: (_, r) => renderStage(r, 'install', 'installRemark') },
+    { title: t('stage.repair'), key: 'repair', dataIndex: 'stages', width: 90, render: (_, r) => renderStage(r, 'repair', 'repairRemark') },
+  ]), [t])
+
+  // apply controlled sort order to columns
+  const columns = useMemo(() => {
+    return allColumns
+      .map(col => ({
+        ...col,
+        sortOrder: sortState.key === col.key ? sortState.order : null,
+      }))
+      .filter(col => visibleKeys.includes(col.key))
+  }, [allColumns, sortState, visibleKeys])
+
+  // column selector content
+  const selectorContent = (
+    <div style={{ width: 240 }}>
+      <Checkbox.Group
+        style={{ width: '100%' }}
+        value={visibleKeys}
+        onChange={(vals) => {
+          const arr = vals
+          // prevent unselecting last column
+          if (!arr.length) return
+          // keep stable order according to allColumnKeys
+          const ordered = allColumnKeys.filter(k => arr.includes(k))
+          setVisibleKeys(ordered)
+        }}
+      >
+        <Space direction="vertical" style={{ width: '100%' }}>
+          {allColumns.map(c => (
+            <Checkbox
+              key={c.key}
+              value={c.key}
+              disabled={visibleKeys.length <= 1 && visibleKeys.includes(c.key)}
+            >{typeof c.title === 'string' ? c.title : t(`field.${c.key}`)}</Checkbox>
+          ))}
+        </Space>
+      </Checkbox.Group>
+      <Divider style={{ margin: '8px 0' }} />
+      <Space>
+        <Button size="small" icon={<ClearOutlined />} onClick={() => setSortState({ key: null, order: null })}>{t('common.clear', 'Clear sort')}</Button>
+        <Button size="small" icon={<RedoOutlined />} onClick={() => { setVisibleKeys([...defaultVisible]); setSortState({ key: null, order: null }) }}>{t('common.reset', 'Reset')}</Button>
+      </Space>
+    </div>
+  )
+
+  // handle table changes (pagination, filters, sorter)
+  const handleTableChange = (pg, filters, sorter) => {
+    // update controlled sort state
+    const s = Array.isArray(sorter) ? sorter[0] : sorter
+    if (s && s.field && s.order) {
+      setSortState({ key: s.columnKey || s.field, order: s.order })
+    } else if (!s || !s.order) {
+      setSortState({ key: null, order: null })
+    }
+
+    // forward pagination changes to external controller if provided
+    if (pg && (pg.current !== pagination?.page || pg.pageSize !== pagination?.pageSize)) {
+      pagination?.onChange?.(pg.current, pg.pageSize)
+    }
+  }
 
   if (isMobile) {
     if (loading) {
@@ -78,6 +166,9 @@ export default function ProjectTable({ projects = [], loading, onRowClick, pagin
         {projects.map(p => {
           const start = p.start_date ? dayjs(p.start_date).format('YYYY-MM-DD') : '-'
           const end = p.end_date ? dayjs(p.end_date).format('YYYY-MM-DD') : '-'
+          const st = p.stages || {}
+          const done = ['repair','install','transport','purchase','frame','glass'].filter(k => !!st[k])
+          const chips = done.slice(0, 2).map(k => t(`stage.${k}`)).join('、') || '-'
           return (
             <button
               key={p.id}
@@ -87,7 +178,7 @@ export default function ProjectTable({ projects = [], loading, onRowClick, pagin
             >
               <div className="flex items-center justify-between">
                 <div className="font-medium text-base">{p.project_code} · {p.name}</div>
-                <Tag color={statusColor(p.status)}>{statusText(p.status)}</Tag>
+                <div className="text-xs text-slate-600">{chips}</div>
               </div>
               {p.address ? (
                 <div className="text-xs text-slate-500 mt-1">{p.address}</div>
@@ -122,6 +213,13 @@ export default function ProjectTable({ projects = [], loading, onRowClick, pagin
       columns={columns}
       dataSource={projects}
       loading={loading}
+      title={() => (
+        <div className="flex justify-end">
+          <Popover placement="left" trigger="click" content={selectorContent}>
+            <Button size="small" icon={<SettingOutlined />}>{t('common.columns', 'Columns')}</Button>
+          </Popover>
+        </div>
+      )}
       pagination={{
         current: pagination?.page,
         pageSize: pagination?.pageSize || 10,
@@ -129,8 +227,9 @@ export default function ProjectTable({ projects = [], loading, onRowClick, pagin
         showSizeChanger: false,
         onChange: pagination?.onChange,
       }}
+      onChange={handleTableChange}
       onRow={(record) => ({ onClick: () => onRowClick?.(record.id) })}
-      scroll={{ x: 800 }}
+      scroll={{ x: 1000 }}
     />
   )
 }

@@ -1,17 +1,18 @@
 import React from 'react'
-import { Descriptions, Drawer, Form, Input, Select, Upload, Button, Space, Grid, Tag, Popconfirm, Image, App as AntdApp, Spin, List, Typography, Tooltip } from 'antd'
+import { Descriptions, Drawer, Form, Input, Upload, Button, Space, Grid, Tag, Popconfirm, Image, App as AntdApp, Spin, List, Typography, Tooltip, Switch } from 'antd'
 import { UploadOutlined, DeleteOutlined, InboxOutlined, DownloadOutlined, LoadingOutlined, CheckCircleTwoTone, CloseCircleTwoTone, ClockCircleTwoTone, ClearOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { getPhotoDownloadUrl, downloadProjectPhoto } from '../api'
-import { normalizeStatus } from '../utils/status'
 import ProjectFormFields from './ProjectFormFields'
+import { getCachedObjectUrlForMedia } from '../utils/mediaCache'
 
-// Simple media with retry: now manual click retries (max 5). On error shows clickable overlay; waits 0.5s before reload.
+// Simple media with retry + Cache API-backed object URL loader.
 function MediaWithRetry({ item, height = 160 }) {
   const MAX_ATTEMPTS = 5
-  const [attempt, setAttempt] = React.useState(0) // manual attempts performed
+  const [attempt, setAttempt] = React.useState(0)
   const [curSrc, setCurSrc] = React.useState(item.src)
+  const [blobUrl, setBlobUrl] = React.useState('')
   const [loaded, setLoaded] = React.useState(false)
   const [failed, setFailed] = React.useState(false)
   const [waiting, setWaiting] = React.useState(false)
@@ -19,24 +20,51 @@ function MediaWithRetry({ item, height = 160 }) {
 
   const isVideo = (item.contentType || '').startsWith('video/')
 
+  // Load via Cache API -> blob URL when token exists
+  React.useEffect(() => {
+    let active = true
+    const doLoad = async () => {
+      try {
+        setLoaded(false); setFailed(false)
+        // If has token and projectId, try cache-backed blob URL; else use direct src
+        if (item.projectId && item.token && item.token !== 'local' && item.src) {
+          const url = await getCachedObjectUrlForMedia(item.projectId, item.token, item.src)
+          if (!active) return
+          // Revoke previous blobUrl
+          if (blobUrl && blobUrl.startsWith('blob:')) URL.revokeObjectURL(blobUrl)
+          setBlobUrl(url)
+          setCurSrc(url)
+        } else {
+          setCurSrc(item.src)
+        }
+      } catch {
+        setCurSrc(item.src)
+      }
+    }
+    doLoad()
+    return () => { active = false; if (waitTimerRef.current) { clearTimeout(waitTimerRef.current); waitTimerRef.current = null } }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.projectId, item.token, item.src])
+
+  React.useEffect(() => () => { if (blobUrl && blobUrl.startsWith('blob:')) URL.revokeObjectURL(blobUrl) }, [blobUrl])
+
   const addCacheBust = React.useCallback((s, a) => {
     try {
       if (!s || typeof s !== 'string') return s
-      if (s.startsWith('data:')) return s
+      if (s.startsWith('data:') || s.startsWith('blob:')) return s
       const sep = s.includes('?') ? '&' : '?'
       return `${s}${sep}retry=${a}&_=${Date.now()}`
     } catch { return s }
   }, [])
 
   React.useEffect(() => {
-    // Reset if item changes
+    // Reset attempt status when source changes
     setAttempt(0)
-    setCurSrc(item.src)
     setLoaded(false)
     setFailed(false)
     setWaiting(false)
     if (waitTimerRef.current) { clearTimeout(waitTimerRef.current); waitTimerRef.current = null }
-  }, [item.src])
+  }, [curSrc])
 
   const cleanupTimer = React.useCallback(() => {
     if (waitTimerRef.current) { clearTimeout(waitTimerRef.current); waitTimerRef.current = null }
@@ -57,7 +85,6 @@ function MediaWithRetry({ item, height = 160 }) {
   const handleManualRetry = React.useCallback(() => {
     if (waiting) return
     if (attempt >= MAX_ATTEMPTS) return
-    // Prepare next attempt
     setWaiting(true)
     cleanupTimer()
     waitTimerRef.current = setTimeout(() => {
@@ -93,16 +120,9 @@ function MediaWithRetry({ item, height = 160 }) {
       const noMore = attempt >= MAX_ATTEMPTS
       const hint = noMore
         ? 'Load failed (max retries)'
-        : (attempt === 0
-            ? 'Load failed – click to reload'
-            : `Load failed – click to reload (${attempt}/${MAX_ATTEMPTS})`)
+        : (attempt === 0 ? 'Load failed – click to reload' : `Load failed – click to reload (${attempt}/${MAX_ATTEMPTS})`)
       return (
-        <div
-          role={!noMore ? 'button' : undefined}
-          aria-label={!noMore ? 'Retry loading media' : 'Load failed'}
-          onClick={!noMore ? handleManualRetry : undefined}
-          style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fee2e2', color: '#b91c1c', fontSize: 12, cursor: noMore ? 'not-allowed' : 'pointer', textAlign: 'center', padding: '0 6px', lineHeight: 1.3 }}
-        >
+        <div role={!noMore ? 'button' : undefined} aria-label={!noMore ? 'Retry loading media' : 'Load failed'} onClick={!noMore ? handleManualRetry : undefined} style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fee2e2', color: '#b91c1c', fontSize: 12, cursor: noMore ? 'not-allowed' : 'pointer', textAlign: 'center', padding: '0 6px', lineHeight: 1.3 }}>
           <span style={{ fontWeight: 500 }}>{item.alt || (isVideo ? 'video' : 'image')}</span>
           <span style={{ marginTop: 4 }}>{hint}</span>
         </div>
@@ -114,24 +134,9 @@ function MediaWithRetry({ item, height = 160 }) {
   return (
     <div style={{ position: 'relative', width: '100%', height, overflow: 'hidden' }}>
       {!isVideo ? (
-        <Image
-          src={curSrc}
-          alt={item.alt}
-          preview={!failed}
-          onLoad={handleLoaded}
-          onError={handleError}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: loaded && !failed ? 'block' : 'none' }}
-        />
+        <Image src={curSrc} alt={item.alt} preview={!failed} onLoad={handleLoaded} onError={handleError} style={{ width: '100%', height: '100%', objectFit: 'cover', display: loaded && !failed ? 'block' : 'none' }} />
       ) : (
-        <video
-          src={curSrc}
-          onCanPlayThrough={handleLoaded}
-          onLoadedData={handleLoaded}
-          onError={handleError}
-          controls={!failed}
-          muted
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: loaded && !failed ? 'block' : 'none', background: '#000' }}
-        />
+        <video src={curSrc} onCanPlayThrough={handleLoaded} onLoadedData={handleLoaded} onError={handleError} controls={!failed} muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: loaded && !failed ? 'block' : 'none', background: '#000' }} />
       )}
       {commonOverlay}
       {showAttemptBadge && (
@@ -150,54 +155,79 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
   const { t } = useTranslation()
   const { message } = AntdApp.useApp()
 
+  // Download a media by token
+  const handleDownload = React.useCallback(async (token) => {
+    if (!project?.id || !token) return
+    try {
+      await downloadProjectPhoto(project.id, token)
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.message || 'Download failed'
+      message.error(msg)
+    }
+  }, [project?.id, message])
+
+  // Intercept Upload to use our custom upload handlers; prevent default auto-upload
+  const beforeUploadCheck = React.useCallback((file, fileList) => {
+    try {
+      if (Array.isArray(fileList) && fileList.length > 1) {
+        const first = fileList[0]
+        if (file.uid === first.uid) {
+          onUploadMany?.(fileList)
+        }
+      } else {
+        onUpload?.(file)
+      }
+    } catch {}
+    return false
+  }, [onUpload, onUploadMany])
+
   const formatPhotoTime = React.useCallback((v) => {
     if (!v) return ''
     let d
-    if (Array.isArray(v)) {
-      const [y, m = 1, d0 = 1, H = 0, M = 0, S = 0] = v
-      d = dayjs(new Date(y, Math.max(0, (m - 1)), d0, H, M, S))
-    } else {
-      d = dayjs(v)
-    }
-    if (d.isValid()) return d.format('YYYY-MM-DD HH:mm')
-    return typeof v === 'string' ? v : ''
+    if (Array.isArray(v)) { const [y, m = 1, d0 = 1, H = 0, M = 0, S = 0] = v; d = dayjs(new Date(y, Math.max(0, (m - 1)), d0, H, M, S)) }
+    else { d = dayjs(v) }
+    return d.isValid() ? d.format('YYYY-MM-DD HH:mm') : (typeof v === 'string' ? v : '')
   }, [])
 
-  const isFinalized = normalizeStatus(project?.status) === 'final_payment_received'
+  const isFinalized = false
 
-  // Items list (define before effects that depend on it)
   const galleryItems = React.useMemo(() => {
     const out = []
     if (Array.isArray(photos)) {
       photos.forEach(ph => {
-        // Prefer explicit src from API/local; otherwise build download URL
         const src = ph?.src || (project?.id && ph?.token ? getPhotoDownloadUrl(project.id, ph.token) : '')
         if (!src) return
         const ct = ph?.contentType || ''
-        out.push({ key: ph.id || `${ph.token}`, src, alt: ph.caption || ct || 'asset', createdAt: ph.createdAt, photoId: ph.id, token: ph.token, contentType: ct })
+        out.push({ key: ph.id || `${ph.token}`, src, alt: ph.caption || ct || 'asset', createdAt: ph.createdAt, photoId: ph.id, token: ph.token, contentType: ct, projectId: project?.id })
       })
     }
-    // If no backend photo items but legacy photo_url exists, include it
     if (!out.length && project?.photo_url) {
-      out.push({ key: 'legacy', src: project.photo_url, alt: 'photo', createdAt: project.created_at, photoId: 'local-1', token: 'local', contentType: 'image/jpeg' })
+      out.push({ key: 'legacy', src: project.photo_url, alt: 'photo', createdAt: project.created_at, photoId: 'local-1', token: 'local', contentType: 'image/jpeg', projectId: project?.id })
     }
     return out
   }, [photos, project])
 
-  // Populate form on project load
   React.useEffect(() => {
     if (!project) return
-    setEditMode(false)
-    setShowNotes(false)
+    setEditMode(false); setShowNotes(false)
     const values = { ...project }
     if (project.start_date || project.end_date) {
       values.dates = [project.start_date ? dayjs(project.start_date) : null, project.end_date ? dayjs(project.end_date) : null].filter(Boolean)
     }
+    values.stages = { ...(project.stages || {}) }
     const tmr = setTimeout(() => form.setFieldsValue(values), 0)
     return () => clearTimeout(tmr)
   }, [project])
 
-  // Actions
+  React.useEffect(() => {
+    if (editMode && project) {
+      const values = { stages: { ...(project.stages || {}) } }
+      // Defer slightly to ensure items are mounted
+      const t = setTimeout(() => form.setFieldsValue(values), 0)
+      return () => clearTimeout(t)
+    }
+  }, [editMode, project])
+
   const onFinish = async () => {
     const values = await form.validateFields()
     const payload = { ...values }
@@ -206,6 +236,7 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
       payload.end_date = values.dates[1] ? dayjs(values.dates[1]).format('YYYY-MM-DD') : ''
       delete payload.dates
     }
+    // Include stages (flags + remarks) in main update
     onSave(payload)
     if (editMode) setEditMode(false)
   }
@@ -219,125 +250,101 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
   const handleDeleteConfirm = () => { onDelete?.() }
 
   const handleEnterEdit = () => {
-    if (isFinalized) return
-    setEditMode(true)
-    setShowNotes(false)
-    const values = { ...project, dates: [project?.start_date ? dayjs(project.start_date) : null, project?.end_date ? dayjs(project.end_date) : null].filter(Boolean) }
+    setEditMode(true); setShowNotes(true)
+    const values = { ...project, dates: [project?.start_date ? dayjs(project.start_date) : null, project?.end_date ? dayjs(project.end_date) : null].filter(Boolean), stages: { ...(project?.stages || {}) } }
     form.setFieldsValue(values)
   }
 
   const handleCancelEdit = () => {
-    setEditMode(false)
-    setShowNotes(false)
-    const values = { ...project, dates: [project?.start_date ? dayjs(project.start_date) : null, project?.end_date ? dayjs(project.end_date) : null].filter(Boolean) }
+    setEditMode(false); setShowNotes(false)
+    const values = { ...project, dates: [project?.start_date ? dayjs(project.start_date) : null, project?.end_date ? dayjs(project.end_date) : null].filter(Boolean), stages: { ...(project?.stages || {}) } }
     form.setFieldsValue(values)
   }
 
-  const statusOptions = [
-    { label: t('status.glass_ordered'), value: 'glass_ordered' },
-    { label: t('status.doors_windows_produced'), value: 'doors_windows_produced' },
-    { label: t('status.doors_windows_delivered'), value: 'doors_windows_delivered' },
-    { label: t('status.doors_windows_installed'), value: 'doors_windows_installed' },
-    { label: t('status.final_payment_received'), value: 'final_payment_received' },
-  ]
-
-  const handleDownload = (token) => {
-    if (!project?.id || !token) return
-    const baseName = project?.project_code ? `${project.project_code}_${token}` : `file_${project.id}_${token}`
-    downloadProjectPhoto(project.id, token, `${baseName}`).catch(() => {})
-  }
-
-  // Upload helpers
-  const MB = 1024 * 1024
-
-  // Simplified: just validate types; compression handled upstream
-  const preprocessFiles = async (files) => {
-    const processed = []
-    for (const f of files) {
-      const type = f?.type || ''
-      const isImage = type.startsWith('image/')
-      const isVideo = type.startsWith('video/')
-      if (!isImage && !isVideo) {
-        message?.warning(t('err.uploadFailed', { msg: 'Only images or videos are allowed' }))
-        continue
-      }
-      processed.push(f)
-    }
-    return processed
-  }
-
-  const validateAndPrepare = async (fileList) => {
-    const files = Array.isArray(fileList) ? fileList : []
-    return await preprocessFiles(files)
-  }
-
-  const beforeUploadCheck = (file, fileList) => {
-    if (isFinalized) return Upload.LIST_IGNORE
-    if (fileList && file === fileList[0]) {
-      ;(async () => {
-        const ready = await validateAndPrepare(fileList)
-        if (ready.length) {
-          if (typeof onUpload === 'function') {
-            for (const f of ready) {
-              try { await onUpload(f) } catch {}
-            }
-          } else if (typeof onUploadMany === 'function') {
-            onUploadMany(ready)
-          }
-        }
-      })()
-    }
-    return false
+  const StageRow = ({ flagKey, remarkKey, label, remarkLabel }) => {
+    return (
+      <div className="flex items-center gap-2">
+        <Form.Item name={[ 'stages', flagKey ]} valuePropName="checked" noStyle>
+          <Switch size="small" />
+        </Form.Item>
+        <span className="w-16 text-slate-700">{label}</span>
+        <Form.Item name={[ 'stages', remarkKey ]} noStyle>
+          <Input size="small" placeholder={remarkLabel} maxLength={255} />
+        </Form.Item>
+      </div>
+    )
   }
 
   return (
-    <Drawer open={open} onClose={onClose} width={isMobile ? '100%' : 520} title={(
-      <div className="flex items-center gap-2">
-        <span>{t('drawer.title')} {project?.project_code || ''}</span>
-        {project?.archived ? <Tag>{t('tag.archived')}</Tag> : null}
-        {isFinalized ? <Tag color="green">{t('tag.completed')}</Tag> : null}
-      </div>
-    )} destroyOnHidden>
-      {(!project && loading) && (
-        <div className="py-10 flex items-center justify-center">
-          <Spin size="large" />
-        </div>
-      )}
+    <Drawer open={open} onClose={onClose} width={isMobile ? '100%' : 520} title={(<div className="flex items-center gap-2"><span>{t('drawer.title')} {project?.project_code || ''}</span>{project?.archived ? <Tag>{t('tag.archived')}</Tag> : null}</div>)} destroyOnHidden>
+      {(!project && loading) && (<div className="py-10 flex items-center justify-center"><Spin size="large" /></div>)}
       {project && (
         <div role="dialog" aria-label={`${t('drawer.title')} ${project?.project_code || ''}`}>
           <Space direction="vertical" className="w-full" size="large">
             {!editMode && (
-              <Descriptions bordered column={1} size="small">
-                <Descriptions.Item label={t('field.projectName')}>{project.name}</Descriptions.Item>
-                <Descriptions.Item label={t('field.address')}>{project.address}</Descriptions.Item>
-                <Descriptions.Item label={t('field.client')}>{project.client_name} / {project.client_phone}</Descriptions.Item>
-                <Descriptions.Item label={t('field.salesPerson')}>{project.sales_person}</Descriptions.Item>
-                <Descriptions.Item label={t('field.installer')}>{project.installer}</Descriptions.Item>
-                <Descriptions.Item label={t('field.dateRange')}>{project.start_date} ~ {project.end_date}</Descriptions.Item>
-              </Descriptions>
+              <>
+                <Descriptions bordered column={1} size="small">
+                  <Descriptions.Item label={t('field.projectName')}>{project.name}</Descriptions.Item>
+                  <Descriptions.Item label={t('field.address')}>{project.address}</Descriptions.Item>
+                  <Descriptions.Item label={t('field.client')}>{project.client_name}</Descriptions.Item>
+                  <Descriptions.Item label={t('field.salesPerson')}>{project.sales_person}</Descriptions.Item>
+                  <Descriptions.Item label={t('field.installer')}>{project.installer}</Descriptions.Item>
+                  <Descriptions.Item label={t('field.dateRange')}>{project.start_date} ~ {project.end_date}</Descriptions.Item>
+                </Descriptions>
+                {/* View-mode: show stage status + remarks */}
+                <div className="bg-white rounded border p-2 space-y-1 mt-2">
+                  <Typography.Text strong>{t('filter.stages')}</Typography.Text>
+                  {(() => {
+                    const st = project?.stages || {}
+                    const items = [
+                      { k: 'glass', label: t('stage.glass'), remark: st.glassRemark, flag: !!st.glass },
+                      { k: 'frame', label: t('stage.frame'), remark: st.frameRemark, flag: !!st.frame },
+                      { k: 'purchase', label: t('stage.purchase'), remark: st.purchaseRemark, flag: !!st.purchase },
+                      { k: 'transport', label: t('stage.transport'), remark: st.transportRemark, flag: !!st.transport },
+                      { k: 'install', label: t('stage.install'), remark: st.installRemark, flag: !!st.install },
+                      { k: 'repair', label: t('stage.repair'), remark: st.repairRemark, flag: !!st.repair },
+                    ]
+                    return items.map(it => (
+                      <div key={it.k} className="flex items-center gap-2 text-[13px]">
+                        {it.flag ? <CheckCircleTwoTone twoToneColor="#22C55E" /> : <CloseCircleTwoTone twoToneColor="#A3A3A3" />}
+                        <span className="w-16 text-slate-700">{it.label}</span>
+                        <span className="text-slate-600">{it.remark || ''}</span>
+                      </div>
+                    ))
+                  })()}
+                </div>
+              </>
             )}
 
             <Form layout="vertical" form={form} initialValues={project} onFinish={onFinish} requiredMark={false}>
               {editMode ? (
-                <ProjectFormFields disabled={isFinalized} showNotes={showNotes} onStatusChange={() => setShowNotes(true)} layout="one-column" withValidation={true} />
+                <>
+                  <ProjectFormFields disabled={isFinalized} showNotes={showNotes} onStatusChange={() => setShowNotes(true)} layout="one-column" withValidation={true} />
+                  <div className="bg-white rounded border p-2 space-y-2 mt-2">
+                    <Typography.Text strong>{t('filter.stages')}</Typography.Text>
+                    <StageRow flagKey="glass" remarkKey="glassRemark" label={t('stage.glass')} remarkLabel={t('stageRemark.glass')} />
+                    <StageRow flagKey="frame" remarkKey="frameRemark" label={t('stage.frame')} remarkLabel={t('stageRemark.frame')} />
+                    <StageRow flagKey="purchase" remarkKey="purchaseRemark" label={t('stage.purchase')} remarkLabel={t('stageRemark.purchase')} />
+                    <StageRow flagKey="transport" remarkKey="transportRemark" label={t('stage.transport')} remarkLabel={t('stageRemark.transport')} />
+                    <StageRow flagKey="install" remarkKey="installRemark" label={t('stage.install')} remarkLabel={t('stageRemark.install')} />
+                    <StageRow flagKey="repair" remarkKey="repairRemark" label={t('stage.repair')} remarkLabel={t('stageRemark.repair')} />
+                  </div>
+                </>
               ) : (
                 <>
                   <Form.Item name="today_task" label={t('field.todayTask')}>
-                    <Input.TextArea rows={2} placeholder={t('placeholder.todayTask')} disabled={isFinalized} data-tour-id="drawer-today-task" />
+                    <Input.TextArea rows={2} placeholder={t('placeholder.todayTask')} disabled={true} data-tour-id="drawer-today-task" />
                   </Form.Item>
                   <Form.Item name="progress_note" label={t('field.progressNote')}>
-                    <Input.TextArea rows={3} placeholder={t('placeholder.progressNote')} disabled={isFinalized} data-tour-id="drawer-progress-note" />
+                    <Input.TextArea rows={3} placeholder={t('placeholder.progressNote')} disabled={true} data-tour-id="drawer-progress-note" />
                   </Form.Item>
                   <Form.Item name="change_note" label={t('field.changeNote')}>
-                    <Input.TextArea rows={2} placeholder={t('placeholder.changeNote')} disabled={isFinalized} data-tour-id="drawer-change-note" />
-                  </Form.Item>
-                  <Form.Item name="status" label={t('field.status')}>
-                    <Select disabled={isFinalized} options={statusOptions} getPopupContainer={() => document.body} data-tour-id="drawer-status" />
+                    <Input.TextArea rows={2} placeholder={t('placeholder.changeNote')} disabled={true} data-tour-id="drawer-change-note" />
                   </Form.Item>
                 </>
               )}
 
-              <Space wrap>
+              <Space wrap className={editMode ? 'mt-4' : undefined}>
                 {!isFinalized && <Button type="primary" onClick={onFinish} loading={saving} disabled={archiving || deleting} data-tour-id="drawer-save">{t('btn.save')}</Button>}
                 {!editMode && !isFinalized && <Button onClick={handleEnterEdit} disabled={saving || archiving || deleting} data-tour-id="drawer-edit">{t('btn.edit')}</Button>}
                 {editMode && !isFinalized && <Button onClick={handleCancelEdit} disabled={saving || archiving || deleting} data-tour-id="drawer-cancel-edit">{t('btn.cancelEdit')}</Button>}
@@ -371,20 +378,8 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
                           <div className="absolute inset-x-0 bottom-0 bg-black/50 text-white px-2 py-1 text-[11px] flex items-center justify-between gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             {timeText ? <span className="text-white/90">{timeText}</span> : <span />}
                             <div className="flex items-center gap-1">
-                              <Button
-                                size="small"
-                                type="text"
-                                icon={<DownloadOutlined style={{ fontSize: 14, color: '#fff' }} />}
-                                onClick={(e) => { e.stopPropagation(); handleDownload(item.token) }}
-                              />
-                              <Button
-                                size="small"
-                                danger
-                                type="text"
-                                icon={<DeleteOutlined style={{ fontSize: 14 }} />}
-                                onClick={(e) => { e.stopPropagation(); onDeletePhoto?.(deleteRef) }}
-                                disabled={isFinalized}
-                              />
+                              <Button size="small" type="text" icon={<DownloadOutlined style={{ fontSize: 14, color: '#fff' }} />} onClick={(e) => { e.stopPropagation(); handleDownload(item.token) }} />
+                              <Button size="small" danger type="text" icon={<DeleteOutlined style={{ fontSize: 14 }} />} onClick={(e) => { e.stopPropagation(); onDeletePhoto?.(deleteRef) }} disabled={isFinalized} />
                             </div>
                           </div>
                         </div>
@@ -394,13 +389,7 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
                 </Image.PreviewGroup>
               )}
 
-              <Upload
-                accept="image/*,video/*"
-                showUploadList={false}
-                multiple
-                disabled={isFinalized || uploading}
-                beforeUpload={beforeUploadCheck}
-              >
+              <Upload accept="image/*,video/*" showUploadList={false} multiple disabled={isFinalized || uploading} beforeUpload={beforeUploadCheck}>
                 <Button icon={<UploadOutlined />} disabled={isFinalized} loading={uploading} data-tour-id="drawer-upload">{t('btn.uploadPhoto')}</Button>
               </Upload>
 
@@ -419,8 +408,7 @@ export default function ProjectDrawer({ open, project, photos = [], onClose, onS
                     renderItem={(it) => {
                       const status = it.status
                       let icon = <ClockCircleTwoTone twoToneColor="#A3A3A3" />
-                      if (status === 'uploading') icon = <LoadingOutlined />
-                      else if (status === 'compressing') icon = <LoadingOutlined />
+                      if (status === 'uploading' || status === 'compressing') icon = <LoadingOutlined />
                       else if (status === 'success') icon = <CheckCircleTwoTone twoToneColor="#22C55E" />
                       else if (status === 'failed') icon = <CloseCircleTwoTone twoToneColor="#EF4444" />
                       const sizeKB = it.size ? Math.round(it.size / 1024) : 0

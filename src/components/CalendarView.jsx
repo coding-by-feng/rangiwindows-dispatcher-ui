@@ -30,20 +30,19 @@ const LOCATION_COORDS = {
 
 function toEvents(projects, t) {
   const list = Array.isArray(projects) ? projects : []
-  const label = (raw) => {
-    const code = normalizeStatus(raw)
-    const allowed = ['glass_ordered', 'doors_windows_produced', 'doors_windows_delivered', 'doors_windows_installed', 'final_payment_received']
-    if (allowed.includes(code)) return t(`status.${code}`)
-    return raw || ''
-  }
-  return list.map(p => ({
-    id: String(p.id),
-    // Exclude project name/code to avoid test selector collisions
-    title: `${p.installer || '-'} / ${label(p.status)}`,
-    start: p.start_date || undefined,
-    end: p.end_date ? dayjs(p.end_date).add(1, 'day').format('YYYY-MM-DD') : undefined,
-    allDay: true,
-  }))
+  return list.map(p => {
+    const st = p.stages || {}
+    const order = ['repair','install','transport','purchase','frame','glass']
+    const first = order.find(k => !!st[k])
+    const label = first ? t(`stage.${first}`) : ''
+    return ({
+      id: String(p.id),
+      title: `${p.installer || '-'} / ${label || '-'}`,
+      start: p.start_date || undefined,
+      end: p.end_date ? dayjs(p.end_date).add(1, 'day').format('YYYY-MM-DD') : undefined,
+      allDay: true,
+    })
+  })
 }
 
 // Weather hook always provides: historical (rain/temp) for past days, forecast probability within API horizon, approximate (prev year averages) for remainder up to one month
@@ -183,7 +182,7 @@ export default function CalendarView({ projects, onEventClick, location, weather
           dayHeaderFormat={isMobile ? { weekday: 'narrow' } : undefined}
           eventClick={(info) => onEventClick(info.event.id)}
           events={events}
-          headerToolbar={{ left: 'prev,next', center: 'title', right: isMobile ? '' : 'today' }}
+          headerToolbar={{ left: 'prev,next', center: 'title', right: 'today' }}
           locales={[zhCnLocale, zhTwLocale]}
           locale={localeStr}
           fixedWeekCount={false}

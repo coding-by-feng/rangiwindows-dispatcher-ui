@@ -16,7 +16,7 @@ test.describe('API base selection - backend prod', () => {
     const calls = { list: 0 }
 
     // Intercept list request against prod base
-    await page.route(`**://${host}/api/projects**`, async (route) => {
+    await page.route(`**://${host}/rangi_windows/api/projects**`, async (route) => {
       calls.list++
       return route.fulfill({
         status: 200,

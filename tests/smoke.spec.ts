@@ -24,4 +24,3 @@ test.describe('Rangi Windows UI smoke', () => {
     await expect(page.getByRole('dialog').getByText('新增项目')).toBeVisible()
   })
 })
-

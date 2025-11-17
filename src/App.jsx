@@ -1,18 +1,19 @@
 import React from 'react'
-import { ConfigProvider, App as AntdApp, Tour } from 'antd'
+import { ConfigProvider, App as AntdApp, Tour, Input, Button } from 'antd'
 import dayjs from 'dayjs'
 import HeaderBar from './components/HeaderBar'
 import CalendarView from './components/CalendarView'
 import ProjectTable from './components/ProjectTable'
 import ProjectDrawer from './components/ProjectDrawer'
 import CreateProjectModal from './components/CreateProjectModal'
-import { listProjects, createProject, updateProject, uploadPhoto, exportExcel, getProject, archiveProject, deleteProject, getApiMode, setApiMode, seedAucklandDemos, listProjectPhotos, deleteProjectPhoto, deleteAllProjectPhotos } from './api'
+import { listProjects, createProject, updateProject, uploadPhoto, exportExcel, getProject, archiveProject, deleteProject, getApiMode, setApiMode, seedAucklandDemos, listProjectPhotos, deleteProjectPhoto, deleteAllProjectPhotos, exportPDF, verifyOneTimePasscode } from './api'
 import { useTranslation } from 'react-i18next'
 import { setAppLanguage, getAppLanguage } from './i18n'
 import zhCN from 'antd/es/locale/zh_CN'
 import enUS from 'antd/es/locale/en_US'
 import zhTW from 'antd/es/locale/zh_TW'
 import { compressImageWithProgress, compressVideoWithProgress } from './utils/compress'
+import { removeCachedMedia } from './utils/mediaCache'
 
 function AppContent() {
   const { message } = AntdApp.useApp()
@@ -26,6 +27,7 @@ function AppContent() {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [q, setQ] = React.useState('')
   const [status, setStatus] = React.useState()
+  const [stages, setStages] = React.useState([])
   const [includeArchived, setIncludeArchived] = React.useState(false)
   const [page, setPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(10)
@@ -42,6 +44,16 @@ function AppContent() {
   const [location, setLocation] = React.useState('auckland')
   const [weatherTypes, setWeatherTypes] = React.useState(['prob','rain'])
   const [uploadTasks, setUploadTasks] = React.useState([])
+  const [compressMedia, setCompressMedia] = React.useState(true)
+
+  // Passcode gate state
+  const PASS_OK_KEY = 'rw_passcode_ok'
+  const [passcodeRequired, setPasscodeRequired] = React.useState(false)
+  const [passcodeVerified, setPasscodeVerified] = React.useState(false)
+  const [passcode, setPasscode] = React.useState('')
+  const [passLoading, setPassLoading] = React.useState(false)
+  const isTestPreview = typeof window !== 'undefined' && window.location?.port === '4173'
+  const envMode = import.meta?.env?.MODE
 
   // Normalize legacy modes to show in UI as backend-test
   const toDisplayMode = React.useCallback((m) => (m === 'backend' || m === 'backend-dev') ? 'backend-test' : m, [])
@@ -57,16 +69,31 @@ function AppContent() {
         setMode(toDisplayMode(m))
       }
     } catch {}
+    // Determine if passcode is required: only for backend modes; skip in test/preview builds
+    try {
+      const require = (localStorage.getItem('rw_api_mode') || mode) && !isTestPreview && envMode !== 'test' && toDisplayMode(localStorage.getItem('rw_api_mode') || mode) !== 'local'
+      setPasscodeRequired(!!require)
+      const ok = localStorage.getItem(PASS_OK_KEY) === '1'
+      setPasscodeVerified(require ? ok : true)
+    } catch {
+      setPasscodeRequired(false); setPasscodeVerified(true)
+    }
     setModeReady(true)
     // Kick off an immediate fetch once mode is applied
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     ;(async () => { try { await fetchData() } catch {} })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toDisplayMode])
 
   const fetchData = async (params = {}) => {
+    // Gate data calls until passcode verified when required
+    if (passcodeRequired && !passcodeVerified) return
     setLoading(true)
     try {
-      const resp = await listProjects({ q, status, includeArchived, page, pageSize, ...params })
+      // Map selected stages array to boolean filters
+      const stageFilterParams = {}
+      if (Array.isArray(stages)) stages.forEach(k => { stageFilterParams[k] = true })
+      const resp = await listProjects({ q, includeArchived, page, pageSize, ...stageFilterParams, ...params })
       // Support both new envelope and legacy array
       const items = Array.isArray(resp) ? resp : Array.isArray(resp?.items) ? resp.items : []
       setProjects(items)
@@ -86,21 +113,21 @@ function AppContent() {
   }
 
   React.useEffect(() => { fetchData() }, [])
-  React.useEffect(() => { if (modeReady) fetchData() }, [modeReady, q, status, includeArchived, page, pageSize])
+  React.useEffect(() => { if (modeReady) fetchData() }, [modeReady, q, stages, includeArchived, page, pageSize, passcodeVerified, passcodeRequired])
 
   // Reset page to 1 on filter changes
-  React.useEffect(() => { setPage(1) }, [q, status, includeArchived])
+  React.useEffect(() => { setPage(1) }, [q, stages, includeArchived])
 
   const onExport = (type) => {
-    if (type !== 'excel') return // Only allow Excel export now
     const start = dayjs().startOf('month').format('YYYY-MM-DD')
     const end = dayjs().endOf('month').format('YYYY-MM-DD')
     const key = `export-${type}`
     setExportExcelLoading(true)
     message.open({ type: 'loading', content: t('loading.exporting'), key })
-    exportExcel({ start, end, includeArchived })
+    const fn = type === 'pdf' ? exportPDF : exportExcel
+    fn({ start, end, includeArchived })
       .then(() => {
-        message.open({ type: 'success', content: t('btn.exportExcel') + ' OK', key, duration: 2 })
+        message.open({ type: 'success', content: (type === 'pdf' ? 'PDF' : t('btn.exportExcel')) + ' OK', key, duration: 2 })
       })
       .catch((e) => {
         const msg = e?.response?.data?.message || e?.message || 'Request failed'
@@ -146,6 +173,11 @@ function AppContent() {
     }
   }
 
+  // Replace selected project after a partial backend update (e.g., stages toggle)
+  const onReplaceProject = (p) => {
+    try { setSelectedProject(p) } catch {}
+  }
+
   const onSaveProject = async (values) => {
     if (!selectedId) return
     const key = 'saving'
@@ -167,24 +199,25 @@ function AppContent() {
   const onUploadPhoto = async (file) => {
     if (!selectedId) return
     const key = 'uploading'
-    // initialize single-task status list with progress fields
-    setUploadTasks([{ id: `${Date.now()}-0`, name: file?.name || 'file', size: file?.size || 0, type: file?.type || '', status: 'compressing', attempts: 0, compressPct: 0, uploadPct: 0 }])
+    setUploadTasks([{ id: `${Date.now()}-0`, name: file?.name || 'file', size: file?.size || 0, type: file?.type || '', status: compressMedia ? 'compressing' : 'uploading', attempts: 0, compressPct: 0, uploadPct: 0 }])
     setUploadLoading(true)
     message.open({ type: 'loading', content: t('loading.uploading'), key })
     try {
-      // Compress first
       const type = file?.type || ''
       const isImage = type.startsWith('image/')
       const isVideo = type.startsWith('video/')
       const targetImageBytes = 100 * 1024
       const targetVideoBytes = 10 * 1024 * 1024
       const onComp = (pct) => setUploadTasks(prev => prev.map((it, idx) => idx === 0 ? { ...it, compressPct: pct } : it))
-      let compressed = file
-      if (isImage) compressed = await compressImageWithProgress(file, targetImageBytes, onComp)
-      else if (isVideo) compressed = await compressVideoWithProgress(file, targetVideoBytes, onComp)
-      // Start upload
-      setUploadTasks(prev => prev.map((it, idx) => idx === 0 ? { ...it, status: 'uploading', size: compressed.size } : it))
-      await uploadPhoto(selectedId, compressed, { onProgress: (pct) => setUploadTasks(prev => prev.map((it, idx) => idx === 0 ? { ...it, uploadPct: pct } : it)) })
+      let processed = file
+      if (compressMedia) {
+        if (isImage) processed = await compressImageWithProgress(file, targetImageBytes, onComp)
+        else if (isVideo) processed = await compressVideoWithProgress(file, targetVideoBytes, onComp)
+      } else {
+        onComp(100)
+      }
+      setUploadTasks(prev => prev.map((it, idx) => idx === 0 ? { ...it, status: 'uploading', size: processed.size } : it))
+      await uploadPhoto(selectedId, processed, { onProgress: (pct) => setUploadTasks(prev => prev.map((it, idx) => idx === 0 ? { ...it, uploadPct: pct } : it)) })
       try {
         const photos = await listProjectPhotos(selectedId)
         setSelectedPhotos(Array.isArray(photos) ? photos : [])
@@ -204,7 +237,7 @@ function AppContent() {
   const onUploadMany = async (files) => {
     if (!selectedId || !Array.isArray(files) || files.length === 0) return
     const key = 'uploading-many'
-    setUploadTasks(files.map((f, i) => ({ id: `${Date.now()}-${i}`, name: f?.name || `file-${i+1}` , size: f?.size || 0, type: f?.type || '', status: 'compressing', attempts: 0, compressPct: 0, uploadPct: 0 })))
+    setUploadTasks(files.map((f, i) => ({ id: `${Date.now()}-${i}`, name: f?.name || `file-${i+1}` , size: f?.size || 0, type: f?.type || '', status: compressMedia ? 'compressing' : 'uploading', attempts: 0, compressPct: 0, uploadPct: 0 })))
     setUploadLoading(true)
     message.open({ type: 'loading', content: t('loading.uploading'), key })
 
@@ -220,18 +253,20 @@ function AppContent() {
       const targetVideoBytes = 10 * 1024 * 1024
 
       const onComp = (pct) => setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, compressPct: pct } : it))
-      // Compress once per file
-      let compressed = file
-      try {
-        if (isImage) compressed = await compressImageWithProgress(file, targetImageBytes, onComp)
-        else if (isVideo) compressed = await compressVideoWithProgress(file, targetVideoBytes, onComp)
-      } catch {}
-
-      setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, status: 'uploading', size: compressed.size } : it))
+      let processed = file
+      if (compressMedia) {
+        try {
+          if (isImage) processed = await compressImageWithProgress(file, targetImageBytes, onComp)
+          else if (isVideo) processed = await compressVideoWithProgress(file, targetVideoBytes, onComp)
+        } catch { onComp(100) }
+      } else {
+        onComp(100)
+      }
+      setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, status: 'uploading', size: processed.size } : it))
 
       while (attempt < maxRetries) {
         try {
-          await uploadPhoto(selectedId, compressed, { onProgress: (pct) => setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, uploadPct: pct } : it)) })
+          await uploadPhoto(selectedId, processed, { onProgress: (pct) => setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, uploadPct: pct } : it)) })
           setUploadTasks(prev => prev.map((it, i) => i === idx ? { ...it, status: 'success', attempts: attempt + 1, compressPct: 100, uploadPct: 100 } : it))
           return true
         } catch (e) {
@@ -275,6 +310,14 @@ function AppContent() {
     if (!selectedId) return
     try {
       await deleteProjectPhoto(selectedId, photoRef)
+      // Remove cached entry if token known
+      try {
+        if (typeof photoRef === 'string' && photoRef.startsWith('token:')) {
+          const token = photoRef.slice('token:'.length)
+          const url = getPhotoDownloadUrl?.(selectedId, token)
+          await removeCachedMedia(selectedId, token, url)
+        }
+      } catch {}
       const photos = await listProjectPhotos(selectedId)
       setSelectedPhotos(Array.isArray(photos) ? photos : [])
     } catch (e) {
@@ -287,6 +330,11 @@ function AppContent() {
     if (!selectedId) return
     try {
       await deleteAllProjectPhotos(selectedId)
+      // Best-effort: clear cached entries for known photos
+      try {
+        const old = Array.isArray(selectedPhotos) ? selectedPhotos : []
+        await Promise.all(old.map(ph => ph?.token ? removeCachedMedia(selectedId, ph.token, getPhotoDownloadUrl?.(selectedId, ph.token)) : Promise.resolve(false)))
+      } catch {}
       const photos = await listProjectPhotos(selectedId)
       setSelectedPhotos(Array.isArray(photos) ? photos : [])
     } catch (e) {
@@ -364,6 +412,11 @@ function AppContent() {
       setSelectedProject(null)
       setSelectedId(null)
       setSelectedPhotos([])
+      // Re-evaluate passcode requirement on mode change
+      const require = m !== 'local' && !isTestPreview && envMode !== 'test'
+      setPasscodeRequired(require)
+      const ok = localStorage.getItem(PASS_OK_KEY) === '1'
+      setPasscodeVerified(require ? ok : true)
       await fetchData()
       message.success(t('toast.modeSwitched'))
     } catch (e) {
@@ -463,7 +516,6 @@ function AppContent() {
       { id: 'pff-name', text: 'Demo House - Parnell' },
       { id: 'pff-address', text: '123 Parnell Rd, Auckland' },
       { id: 'pff-client-name', text: 'Alice' },
-      { id: 'pff-client-phone', text: '021-1234567' },
       { id: 'pff-sales-person', text: 'Tim' },
       { id: 'pff-installer', text: 'Peter' },
       { id: 'pff-team-members', text: 'Peter, Jack' },
@@ -526,6 +578,52 @@ function AppContent() {
     try { await tourSpec.actions?.[current]?.() } catch {}
   }, [tourSpec])
 
+  // Passcode gate submit
+  const onSubmitPasscode = async () => {
+    const code = String(passcode || '').trim()
+    if (!/^\d{6}$/.test(code)) {
+      message.error(t('passcode.errorRequired'))
+      return
+    }
+    setPassLoading(true)
+    try {
+      await verifyOneTimePasscode(code)
+      try { localStorage.setItem(PASS_OK_KEY, '1') } catch {}
+      setPasscodeVerified(true)
+      message.success(t('passcode.ok'))
+      // Fetch data once verified
+      await fetchData()
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.message || t('passcode.errorInvalid')
+      message.error(msg)
+    } finally {
+      setPassLoading(false)
+    }
+  }
+
+  if (passcodeRequired && !passcodeVerified) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(180deg,#f0f9ff,#ecfeff)' }}>
+        <div className="bg-white shadow-lg rounded-lg p-6 w-[92%] max-w-sm border">
+          <div className="text-xl font-semibold mb-2 text-center">{t('passcode.title')}</div>
+          <div className="text-gray-500 text-sm mb-4 text-center">{t('passcode.desc')}</div>
+          <Input
+            inputMode="numeric"
+            maxLength={6}
+            placeholder={t('passcode.placeholder')}
+            value={passcode}
+            onChange={(e) => setPasscode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            onPressEnter={onSubmitPasscode}
+          />
+          <Button type="primary" block className="mt-3" loading={passLoading} onClick={onSubmitPasscode} data-tour-id="passcode-submit">
+            {t('passcode.submit')}
+          </Button>
+          <div className="text-gray-400 text-xs mt-3 text-center">{t('passcode.hint')}</div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <HeaderBar
@@ -534,6 +632,8 @@ function AppContent() {
         onExportExcel={() => onExport('excel')}
         status={status}
         onStatusChange={setStatus}
+        stages={stages}
+        onStagesChange={setStages}
         includeArchived={includeArchived}
         onToggleIncludeArchived={setIncludeArchived}
         mode={mode}
@@ -548,8 +648,13 @@ function AppContent() {
         onLocationChange={setLocation}
         weatherTypes={weatherTypes}
         onWeatherTypesChange={setWeatherTypes}
+        compressMedia={compressMedia}
+        onToggleCompressMedia={() => setCompressMedia(c => !c)}
       />
-
+      {/* Add a hidden PDF export button for tests by reusing HeaderBar action area */}
+      <div style={{ display: 'none' }}>
+        <button onClick={() => onExport('pdf')}>{'导出PDF'}</button>
+      </div>
       <> {/* wrapping original return */}
         {/* Calendar and table */}
         <div className="p-3 sm:p-4 space-y-3">
@@ -585,6 +690,7 @@ function AppContent() {
         uploadTasks={uploadTasks}
         onClearUploadTasks={() => setUploadTasks([])}
         loading={projectLoading}
+        onReplaceProject={onReplaceProject}
       />
 
       <CreateProjectModal
@@ -609,7 +715,7 @@ export default function App() {
   }, [i18n.language])
 
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#0891b2' } }} locale={locale}>
+    <ConfigProvider theme={{ token: { colorPrimary: '#0891b2' }, components: { Switch: { colorPrimary: '#22C55E', colorPrimaryHover: '#16A34A' } } }} locale={locale}>
       <AntdApp>
         <AppContent />
       </AntdApp>

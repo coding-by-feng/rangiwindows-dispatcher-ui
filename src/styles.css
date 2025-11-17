@@ -24,6 +24,10 @@
   overflow: auto;
 }
 
+/* Stage switch colors */
+.ant-switch-checked { background-color: #22C55E !important; }
+.ant-switch:not(.ant-switch-checked) { background-color: #D1D5DB !important; }
+
 /* Mobile responsiveness */
 @media (max-width: 640px) {
   /* FullCalendar header and cells on small screens */

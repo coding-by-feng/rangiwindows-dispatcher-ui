@@ -25,7 +25,14 @@ const isTestMode = ENV_MODE === 'test'
 // Persisted runtime mode
 const LS_MODE_KEY = 'rw_api_mode'
 function readMode() {
-  try { return localStorage.getItem(LS_MODE_KEY) || ENV_DEFAULT_MODE_LOCAL } catch { return ENV_DEFAULT_MODE_LOCAL }
+  try {
+    const saved = localStorage.getItem(LS_MODE_KEY)
+    if (saved) return saved
+  } catch {}
+  // In Playwright test builds or vite preview on test port, prefer local by default
+  const isPreviewTest = (typeof window !== 'undefined' && window?.location?.port === '4173')
+  if (isTestMode || isPreviewTest) return 'local'
+  return ENV_DEFAULT_MODE_LOCAL
 }
 function normalizeMode(m) { return (m === 'backend' || m === 'backend-dev') ? 'backend-test' : m }
 let currentMode = normalizeMode(readMode())
@@ -119,6 +126,21 @@ async function downloadBlob(getter, fallbackName) {
   URL.revokeObjectURL(url)
 }
 
+// ---------------- Auth: simple one-time passcode verify ----------------
+export async function verifyOneTimePasscode(code) {
+  // Accept either JSON body or query param; prefer JSON
+  const path = `/oauth/one-time/verify-code`
+  // Use same base as other API calls; in deployments these are typically co-hosted behind the gateway
+  const c = client()
+  try {
+    await c.post(path, { code })
+    return true
+  } catch (e) {
+    // Re-throw to let caller show message
+    throw e
+  }
+}
+
 // ---------------- Local storage store (local mode) ----------------
 const LS_KEY = 'rw_projects'
 function loadLocal() {
@@ -154,6 +176,25 @@ function normalizeStatusCode(s) {
   return normalizeStatusUtil(s)
 }
 
+// Ensure stages object with defaults (for UI)
+function ensureStages(stages) {
+  const s = stages && typeof stages === 'object' ? stages : {}
+  return {
+    glass: !!s.glass,
+    glassRemark: s.glassRemark || '',
+    frame: !!s.frame,
+    frameRemark: s.frameRemark || '',
+    purchase: !!s.purchase,
+    purchaseRemark: s.purchaseRemark || '',
+    transport: !!s.transport,
+    transportRemark: s.transportRemark || '',
+    install: !!s.install,
+    installRemark: s.installRemark || '',
+    repair: !!s.repair,
+    repairRemark: s.repairRemark || '',
+  }
+}
+
 // Map backend <-> frontend field names to keep UI stable (snake_case internally)
 function toIsoFromCreatedAt(raw) {
   if (Array.isArray(raw)) {
@@ -172,13 +213,14 @@ function mapToFrontend(p = {}) {
     project_code: pick('project_code', 'projectCode'),
     name: p.name,
     client_name: pick('client_name', 'clientName'),
-    client_phone: pick('client_phone', 'clientPhone'),
+    // client_phone removed
     address: p.address,
     sales_person: pick('sales_person', 'salesPerson'),
     installer: p.installer,
     team_members: pick('team_members', 'teamMembers'),
     start_date: pick('start_date', 'startDate'),
     end_date: pick('end_date', 'endDate'),
+    // Keep legacy status for backward compat (local seed) but UI no longer relies on it
     status: normalizeStatusCode(p.status),
     today_task: pick('today_task', 'todayTask'),
     progress_note: pick('progress_note', 'progressNote'),
@@ -187,6 +229,8 @@ function mapToFrontend(p = {}) {
     archived: p.archived,
     created_at: p.created_at !== undefined ? p.created_at : toIsoFromCreatedAt(p.createdAt),
     change_note: pick('change_note', 'changeNote'),
+    // New: stages
+    stages: ensureStages(p.stages),
   }
 }
 function mapToBackend(values = {}) {
@@ -196,19 +240,22 @@ function mapToBackend(values = {}) {
     projectCode: values.project_code,
     name: values.name,
     clientName: values.client_name,
-    clientPhone: values.client_phone,
+    // clientPhone removed
     address: values.address,
     salesPerson: values.sales_person,
     installer: values.installer,
     teamMembers: values.team_members,
     startDate: values.start_date,
     endDate: values.end_date,
+    // status deprecated in BE but keep passthrough if present (ignored server-side)
     status: values.status,
     todayTask: values.today_task,
     progressNote: values.progress_note,
     // photoUrl removed in new BE spec
     archived: values.archived,
     changeNote: values.change_note,
+    // New: forward stages object as-is
+    stages: values.stages ? { ...values.stages } : undefined,
   }
   // Remove undefined keys to keep payload clean
   Object.keys(out).forEach(k => out[k] === undefined && delete out[k])
@@ -221,10 +268,14 @@ function mapToBackendWithBothKeys(values = {}) {
 }
 
 // ---------------- Backend implementations ----------------
+const API_PREFIX = '/rangi_windows/api'
+
 async function listProjectsBackend(params = {}) {
   const q = { ...params }
   if (!params?.includeArchived) q.archived = false
-  const { data } = await client().get('/rangi_windows/api/projects', { params: q })
+  // Remove legacy status filter; stage filters are passed-through (glass, frame, purchase, transport, install, repair)
+  delete q.status
+  const { data } = await client().get(`${API_PREFIX}/projects`, { params: q })
   // New BE returns envelope { items, page, pageSize, total }
   let items = []
   let page = Number(params.page) || 1
@@ -245,32 +296,38 @@ async function listProjectsBackend(params = {}) {
   return { items: items.map(p => mapToFrontend(p)), page, pageSize, total }
 }
 async function getProjectBackend(id) {
-  const { data } = await client().get(`/rangi_windows/api/projects/${id}`)
+  const { data } = await client().get(`${API_PREFIX}/projects/${id}`)
   if (!data) throw new Error('Project not found')
   return mapToFrontend(data)
 }
 async function createProjectBackend(values) {
   const payload = mapToBackendWithBothKeys(values)
-  const { data } = await client().post('/rangi_windows/api/projects', payload)
+  const { data } = await client().post(`${API_PREFIX}/projects`, payload)
   return mapToFrontend(data)
 }
 async function updateProjectBackend(id, values) {
   const payload = mapToBackendWithBothKeys(values)
-  const { data } = await client().patch(`/rangi_windows/api/projects/${id}`, payload)
+  const { data } = await client().patch(`${API_PREFIX}/projects/${id}`, payload)
+  return mapToFrontend(data)
+}
+async function updateProjectStagesBackend(id, stagesPatch = {}) {
+  const body = { ...stagesPatch }
+  const { data } = await client().patch(`${API_PREFIX}/projects/${id}/stages`, body)
   return mapToFrontend(data)
 }
 async function archiveProjectBackend(id, archived = true) {
-  const { data } = await client().patch(`/rangi_windows/api/projects/${id}`, { archived })
+  // Some BE may use POST /archive; keep PATCH as existing contract if supported
+  const { data } = await client().patch(`${API_PREFIX}/projects/${id}`, { archived })
   return mapToFrontend(data)
 }
 async function deleteProjectBackend(id) {
-  await client().delete(`/rangi_windows/api/projects/${id}`)
+  await client().delete(`${API_PREFIX}/projects/${id}`)
   return true
 }
 async function uploadPhotoBackend(id, file, opts = {}) {
   const fd = new FormData()
   fd.append('file', file)
-  const { data } = await client().post(`/rangi_windows/api/projects/${id}/photo`, fd, {
+  const { data } = await client().post(`${API_PREFIX}/projects/${id}/photo`, fd, {
     headers: { 'Content-Type': 'multipart/form-data' },
     onUploadProgress: (evt) => {
       try {
@@ -284,24 +341,28 @@ async function uploadPhotoBackend(id, file, opts = {}) {
   return data
 }
 async function listProjectPhotosBackend(id) {
-  const { data } = await client().get(`/rangi_windows/api/projects/${id}/photos`)
+  const { data } = await client().get(`${API_PREFIX}/projects/${id}/photos`)
   return Array.isArray(data) ? data : []
 }
 async function deleteProjectPhotoBackend(id, photoId) {
-  await client().delete(`/rangi_windows/api/projects/${id}/photos/${photoId}`)
+  await client().delete(`${API_PREFIX}/projects/${id}/photos/${photoId}`)
   return true
 }
 async function deleteProjectPhotoByTokenBackend(id, token) {
-  await client().delete(`/rangi_windows/api/projects/${id}/photo/${token}`)
+  await client().delete(`${API_PREFIX}/projects/${id}/photo/${token}`)
   return true
 }
 async function deleteAllProjectPhotosBackend(id) {
-  await client().delete(`/rangi_windows/api/projects/${id}/photos`)
+  await client().delete(`${API_PREFIX}/projects/${id}/photos`)
   return true
 }
-async function exportExcelBackend({ start, end, archived, includeArchived }) {
+async function exportExcelBackend({ start, end, archived, includeArchived, ...stageFilters }) {
   const name = `施工安排表_${start || ''}_${end || ''}.xlsx`
-  await downloadBlob(() => client().get('/rangi_windows/api/export/excel', { params: { start, end, archived, includeArchived }, responseType: 'blob' }), name)
+  await downloadBlob(() => client().get(`${API_PREFIX}/export/excel`, { params: { start, end, archived, includeArchived, ...stageFilters }, responseType: 'blob' }), name)
+}
+async function exportPdfBackend({ start, end, archived, includeArchived, ...stageFilters }) {
+  const name = `施工安排表_${start || ''}_${end || ''}.pdf`
+  await downloadBlob(() => client().get(`${API_PREFIX}/export/pdf`, { params: { start, end, archived, includeArchived, ...stageFilters }, responseType: 'blob' }), name)
 }
 
 // ---------------- Public API (switches by runtime mode) ----------------
@@ -317,39 +378,52 @@ export async function listProjects(params = {}) {
     // - default => exclude archived
     .filter(p => (archivedFlag === true) ? p.archived === true : (includeArchived ? true : p.archived !== true))
     .filter(p => matchQuery(p, params.q))
-    .filter(p => matchStatus(p, params.status))
+    // Stage filters: if a boolean param is provided and true, require corresponding stage true
+    .filter(p => {
+      const st = ensureStages(p.stages)
+      const tests = ['glass','frame','purchase','transport','install','repair']
+      for (const key of tests) {
+        if (params[key] === true && !st[key]) return false
+        if (params[key] === false && st[key]) return false // allow explicit false filter if UI provides
+      }
+      // Legacy status filter (no longer used) kept for backward compatibility
+      if (params.status) return matchStatus(p, params.status)
+      return true
+    })
     .filter(p => inRange(p, params.start, params.end))
   const page = Number(params.page) || 1
   const pageSize = Number(params.pageSize) || 10
   const total = filtered.length
   const startIdx = (page - 1) * pageSize
   const items = filtered.slice(startIdx, startIdx + pageSize)
-  return { items, page, pageSize, total }
+  // Normalize items to include defaulted stages for UI safety
+  return { items: items.map(mapToFrontend), page, pageSize, total }
 }
 
 export async function getProject(id) {
   if (usingBackend()) return getProjectBackend(id)
   const list = loadLocal()
-  return list.find(p => String(p.id) === String(id))
+  const found = list.find(p => String(p.id) === String(id))
+  return found ? mapToFrontend(found) : undefined
 }
 
 export async function createProject(values) {
   if (usingBackend()) return createProjectBackend(values)
   const list = loadLocal()
   const id = nextId(list)
+  const stages = ensureStages(values.stages)
   const project = {
     id,
     project_code: nextCode(list),
     name: values.name,
     client_name: values.client_name,
-    client_phone: values.client_phone,
     address: values.address,
     sales_person: values.sales_person,
     installer: values.installer,
     team_members: values.team_members,
     start_date: values.start_date,
     end_date: values.end_date,
-    status: values.status || 'glass_ordered',
+    status: values.status || 'glass_ordered', // legacy, not used by UI
     today_task: values.today_task || '',
     progress_note: values.progress_note || '',
     photo_url: '',
@@ -358,9 +432,11 @@ export async function createProject(values) {
     change_note: values.change_note || '',
     // Support multiple photos in local mode
     photos: [],
+    // New stages
+    stages,
   }
   saveLocal([...list, project])
-  return project
+  return mapToFrontend(project)
 }
 
 export async function updateProject(id, values) {
@@ -372,10 +448,25 @@ export async function updateProject(id, values) {
   const updated = {
     ...current,
     ...values,
+    // Merge stages if provided
+    ...(values.stages ? { stages: { ...ensureStages(current.stages), ...values.stages } } : {}),
   }
   list[idx] = updated
   saveLocal(list)
-  return updated
+  return mapToFrontend(updated)
+}
+
+export async function updateProjectStages(id, stagesPatch = {}) {
+  if (usingBackend()) return updateProjectStagesBackend(id, stagesPatch)
+  // Local: patch only stages
+  const list = loadLocal()
+  const idx = list.findIndex(p => String(p.id) === String(id))
+  if (idx === -1) throw new Error('Project not found')
+  const current = list[idx]
+  const merged = { ...ensureStages(current.stages), ...stagesPatch }
+  list[idx] = { ...current, stages: merged }
+  saveLocal(list)
+  return mapToFrontend(list[idx])
 }
 
 export async function archiveProject(id, archived = true) {
@@ -385,7 +476,7 @@ export async function archiveProject(id, archived = true) {
   if (idx === -1) throw new Error('Project not found')
   list[idx] = { ...list[idx], archived: !!archived }
   saveLocal(list)
-  return list[idx]
+  return mapToFrontend(list[idx])
 }
 
 export async function deleteProject(id) {
@@ -484,7 +575,7 @@ export async function deleteAllProjectPhotos(id) {
 
 export function getPhotoDownloadUrl(projectId, token) {
   const base = getApiBaseUrl() || ''
-  return `${base}/rangi_windows/api/projects/${projectId}/photo/${token}`
+  return `${base}${API_PREFIX}/projects/${projectId}/photo/${token}`
 }
 
 // Simple global queue to serialize downloads across the app
@@ -500,7 +591,7 @@ export async function downloadProjectPhoto(projectId, token, fallbackName = 'pho
       let lastErr
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-          const res = await client().get(`/rangi_windows/api/projects/${projectId}/photo/${token}`, { responseType: 'blob' })
+          const res = await client().get(`${API_PREFIX}/projects/${projectId}/photo/${token}`, { responseType: 'blob' })
           const blob = new Blob([res.data])
           const url = URL.createObjectURL(blob)
           const a = document.createElement('a')
@@ -546,25 +637,78 @@ export async function downloadProjectPhoto(projectId, token, fallbackName = 'pho
 }
 
 // ---------------- Excel export (backend + local) ----------------
-export async function exportExcel({ start, end, archived, includeArchived }) {
-  if (usingBackend()) return exportExcelBackend({ start, end, archived, includeArchived })
+export async function exportExcel({ start, end, archived, includeArchived, ...stageFilters }) {
+  if (usingBackend()) return exportExcelBackend({ start, end, archived, includeArchived, ...stageFilters })
   const rows = await getLocalByRange(start, end)
   const { utils, writeFile } = await import('xlsx')
-  const data = rows.map(p => ({
-    [i18n.t('field.projectCode')]: p.project_code,
-    [i18n.t('field.projectName')]: p.name,
-    [i18n.t('field.client')]: p.client_name,
-    [i18n.t('field.address')]: p.address,
-    [i18n.t('field.salesPerson')]: p.sales_person,
-    [i18n.t('field.installer')]: p.installer,
-    [i18n.t('field.startDate')]: p.start_date,
-    [i18n.t('field.endDate')]: p.end_date,
-    [i18n.t('field.status')]: i18n.t(`status.${p.status}`),
-    [i18n.t('field.changeNote')]: p.change_note,
-  }))
+  const yn = (b) => (b ? i18n.t('common.yes') : i18n.t('common.no'))
+  const data = rows.map(p => {
+    const st = ensureStages(p.stages)
+    return {
+      [i18n.t('field.projectCode')]: p.project_code,
+      [i18n.t('field.projectName')]: p.name,
+      [i18n.t('field.client')]: p.client_name,
+      [i18n.t('field.address')]: p.address,
+      [i18n.t('field.salesPerson')]: p.sales_person,
+      [i18n.t('field.installer')]: p.installer,
+      [i18n.t('field.startDate')]: p.start_date,
+      [i18n.t('field.endDate')]: p.end_date,
+      // Stages and remarks
+      [i18n.t('stage.glass')]: yn(st.glass),
+      [i18n.t('stageRemark.glass')]: st.glassRemark || '',
+      [i18n.t('stage.frame')]: yn(st.frame),
+      [i18n.t('stageRemark.frame')]: st.frameRemark || '',
+      [i18n.t('stage.purchase')]: yn(st.purchase),
+      [i18n.t('stageRemark.purchase')]: st.purchaseRemark || '',
+      [i18n.t('stage.transport')]: yn(st.transport),
+      [i18n.t('stageRemark.transport')]: st.transportRemark || '',
+      [i18n.t('stage.install')]: yn(st.install),
+      [i18n.t('stageRemark.install')]: st.installRemark || '',
+      [i18n.t('stage.repair')]: yn(st.repair),
+      [i18n.t('stageRemark.repair')]: st.repairRemark || '',
+      [i18n.t('field.changeNote')]: p.change_note,
+    }
+  })
   const wb = utils.book_new(); const ws = utils.json_to_sheet(data)
   utils.book_append_sheet(wb, ws, i18n.t('excel.sheet'))
   writeFile(wb, i18n.t('excel.filename', { start: start || '', end: end || '' }))
+}
+
+export async function exportPDF({ start, end, archived, includeArchived, ...stageFilters }) {
+  if (usingBackend()) return exportPdfBackend({ start, end, archived, includeArchived, ...stageFilters })
+  // Local mode: synthesize a minimal PDF-like file by exporting text and saving as .pdf
+  const rows = await getLocalByRange(start, end)
+  const yn = (b) => (b ? i18n.t('common.yes') : i18n.t('common.no'))
+  const lines = []
+  lines.push(`${i18n.t('pdf.title')} ${start || ''}~${end || ''}`)
+  rows.forEach(p => {
+    const st = ensureStages(p.stages)
+    const remarkParts = []
+    if (st.glassRemark) remarkParts.push(`${i18n.t('stage.glass')}: ${st.glassRemark}`)
+    if (st.frameRemark) remarkParts.push(`${i18n.t('stage.frame')}: ${st.frameRemark}`)
+    if (st.purchaseRemark) remarkParts.push(`${i18n.t('stage.purchase')}: ${st.purchaseRemark}`)
+    if (st.transportRemark) remarkParts.push(`${i18n.t('stage.transport')}: ${st.transportRemark}`)
+    if (st.installRemark) remarkParts.push(`${i18n.t('stage.install')}: ${st.installRemark}`)
+    if (st.repairRemark) remarkParts.push(`${i18n.t('stage.repair')}: ${st.repairRemark}`)
+    const remarksJoined = remarkParts.length ? ` | ${i18n.t('pdf.stageRemarks')}: ${remarkParts.join('; ')}` : ''
+    lines.push(`${p.project_code} ${p.name} ${p.start_date || ''}~${p.end_date || ''} [${i18n.t('stage.install')}:${yn(st.install)}]${remarksJoined}`)
+  })
+  const text = lines.join('\n')
+  const blob = new Blob([text], { type: 'application/pdf' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = i18n.t('pdf.filename', { start: start || '', end: end || '' })
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+// Helper to get local rows by range for export
+async function getLocalByRange(start, end) {
+  const list = loadLocal()
+  return list.filter(p => inRange(p, start, end))
 }
 
 // Seed at least N Auckland demo projects in local mode; returns created count
@@ -605,7 +749,6 @@ export async function seedAucklandDemos(min = 10) {
       project_code: nextCode(list),
       name: `Auckland Window Installation - ${suburb}`,
       client_name: rand(clients),
-      client_phone: `021-${randInt(1000000, 9999999)}`,
       address: `${houseNo} ${street} St, ${suburb}, Auckland, NZ`,
       sales_person: rand(sales),
       installer: rand(installers),
@@ -619,6 +762,8 @@ export async function seedAucklandDemos(min = 10) {
       archived: false,
       created_at: dayjs().toISOString(),
       photos: [],
+      // New: randomize a couple of stages
+      stages: ensureStages({ glass: Math.random() > 0.3, frame: Math.random() > 0.5, purchase: Math.random() > 0.6, transport: Math.random() > 0.7, install: Math.random() > 0.8, repair: false }),
     }
 
     list.push(project)

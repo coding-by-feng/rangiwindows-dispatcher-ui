@@ -1,13 +1,49 @@
 import React from 'react'
-import { Button, Input, Space, Typography, Select, Switch } from 'antd'
-import { FileExcelOutlined, PlusOutlined, DownOutlined, UpOutlined, QuestionCircleOutlined } from '@ant-design/icons'
+import { Button, Input, Space, Typography, Select, Switch, Checkbox, Dropdown } from 'antd'
+import { FileExcelOutlined, PlusOutlined, DownOutlined, UpOutlined, QuestionCircleOutlined, FilterOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 
 const { Title } = Typography
 
-export default function HeaderBar({ onSearch, onAdd, onExportExcel, status, onStatusChange, includeArchived = false, onToggleIncludeArchived, mode, onModeChange, onSeedDemo, lang, onLangChange, exportExcelLoading = false, onStartTour, seedLoading = false, location, onLocationChange, weatherTypes = [], onWeatherTypesChange }) {
+export default function HeaderBar({ onSearch, onAdd, onExportExcel, status, onStatusChange, stages = [], onStagesChange, includeArchived = false, onToggleIncludeArchived, mode, onModeChange, onSeedDemo, lang, onLangChange, exportExcelLoading = false, onStartTour, seedLoading = false, location, onLocationChange, weatherTypes = [], onWeatherTypesChange, compressMedia = true, onToggleCompressMedia }) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = React.useState(true)
+
+  const baseStageOptions = React.useMemo(() => ([
+    { label: t('stage.glass'), value: 'glass' },
+    { label: t('stage.frame'), value: 'frame' },
+    { label: t('stage.purchase'), value: 'purchase' },
+    { label: t('stage.transport'), value: 'transport' },
+    { label: t('stage.install'), value: 'install' },
+    { label: t('stage.repair'), value: 'repair' },
+  ]), [t])
+
+  // Selected items should appear at the top
+  const stageOptions = React.useMemo(() => {
+    const sel = new Set(Array.isArray(stages) ? stages : [])
+    const selected = baseStageOptions.filter(o => sel.has(o.value))
+    const unselected = baseStageOptions.filter(o => !sel.has(o.value))
+    return [...selected, ...unselected]
+  }, [baseStageOptions, stages])
+
+  const stageMenu = (
+    <div
+      className="p-2 bg-white rounded shadow-lg border"
+      style={{ width: 240, background: '#ffffff' }}
+    >
+      <Checkbox.Group
+        className="w-full"
+        value={stages}
+        onChange={(vals) => onStagesChange?.(vals)}
+      >
+        <div className="grid grid-cols-2 gap-2">
+          {stageOptions.map(opt => (
+            <Checkbox key={opt.value} value={opt.value}>{opt.label}</Checkbox>
+          ))}
+        </div>
+      </Checkbox.Group>
+    </div>
+  )
 
   return (
     <div className="w-full bg-white border-b px-3 sm:px-4 py-3 sticky top-0 z-10">
@@ -73,28 +109,31 @@ export default function HeaderBar({ onSearch, onAdd, onExportExcel, status, onSt
               ]}
             />
 
-            {/* Search + Filters */}
+            {/* Search + Stage Filters */}
             <Input.Search allowClear placeholder={t('search.placeholder')} onSearch={onSearch} className="w-full sm:w-80" data-tour-id="search-input" />
-            <Select
-              allowClear
-              placeholder={t('filter.status')}
-              className="w-full sm:w-40"
-              value={status}
-              onChange={onStatusChange}
-              data-tour-id="status-filter"
-              options={[
-                { label: t('status.glass_ordered'), value: 'glass_ordered' },
-                { label: t('status.doors_windows_produced'), value: 'doors_windows_produced' },
-                { label: t('status.doors_windows_delivered'), value: 'doors_windows_delivered' },
-                { label: t('status.doors_windows_installed'), value: 'doors_windows_installed' },
-                { label: t('status.final_payment_received'), value: 'final_payment_received' },
-              ]}
-            />
+
+            <Dropdown
+              trigger={["click"]}
+              dropdownRender={() => stageMenu}
+              overlayStyle={{ zIndex: 2000 }}
+              getPopupContainer={() => document.body}
+              placement="bottomLeft"
+            >
+              <Button icon={<FilterOutlined />} data-tour-id="stage-filter">
+                {t('filter.stages')}
+                {Array.isArray(stages) && stages.length > 0 ? ` (${stages.length})` : ''}
+              </Button>
+            </Dropdown>
+
             <div className="flex items-center gap-1" data-tour-id="archived-toggle">
               <Switch size="small" checked={includeArchived} onChange={onToggleIncludeArchived} />
               <span className="text-xs text-slate-600">{t('label.showArchived')}</span>
             </div>
-
+            {/* Compression toggle */}
+            <div className="flex items-center gap-1" data-tour-id="compress-toggle" aria-hidden>
+              <Switch size="small" checked={compressMedia} onChange={onToggleCompressMedia} aria-hidden />
+              <span className="text-xs text-slate-600" aria-hidden>{t('label.compressMedia')}</span>
+            </div>
             {/* Actions */}
             <Space wrap size={[8, 8]}>
               <Button icon={<FileExcelOutlined />} onClick={onExportExcel} loading={exportExcelLoading} data-tour-id="export-excel">{t('btn.exportExcel')}</Button>
