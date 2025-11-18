@@ -9,7 +9,7 @@ import { getCachedObjectUrlForMedia } from '../utils/mediaCache'
 
 // Simple media with retry + Cache API-backed object URL loader.
 function MediaWithRetry({ item, height = 160 }) {
-  const MAX_ATTEMPTS = 5
+  const MAX_ATTEMPTS = 10
   const [attempt, setAttempt] = React.useState(0)
   const [curSrc, setCurSrc] = React.useState(item.src)
   const [blobUrl, setBlobUrl] = React.useState('')
@@ -57,14 +57,14 @@ function MediaWithRetry({ item, height = 160 }) {
     } catch { return s }
   }, [])
 
+  // Reset attempt and transient states only when the underlying item changes (not on each retry src change)
   React.useEffect(() => {
-    // Reset attempt status when source changes
     setAttempt(0)
     setLoaded(false)
     setFailed(false)
     setWaiting(false)
     if (waitTimerRef.current) { clearTimeout(waitTimerRef.current); waitTimerRef.current = null }
-  }, [curSrc])
+  }, [item.projectId, item.token, item.src])
 
   const cleanupTimer = React.useCallback(() => {
     if (waitTimerRef.current) { clearTimeout(waitTimerRef.current); waitTimerRef.current = null }
@@ -72,31 +72,46 @@ function MediaWithRetry({ item, height = 160 }) {
 
   React.useEffect(() => () => cleanupTimer(), [cleanupTimer])
 
-  const handleLoaded = React.useCallback(() => {
-    setLoaded(true)
-    setFailed(false)
-  }, [])
-
-  const handleError = React.useCallback(() => {
-    setLoaded(false)
-    setFailed(true)
-  }, [])
-
-  const handleManualRetry = React.useCallback(() => {
-    if (waiting) return
-    if (attempt >= MAX_ATTEMPTS) return
+  const scheduleRetry = React.useCallback((nextAttempt) => {
+    // Exponential-ish backoff: 300, 500, 800, 1300, 2100ms ...
+    const delays = [300, 500, 800, 1300, 2100, 3000, 4000, 5000, 6000, 7000]
+    const delay = delays[Math.min(nextAttempt - 1, delays.length - 1)]
     setWaiting(true)
     cleanupTimer()
     waitTimerRef.current = setTimeout(() => {
       waitTimerRef.current = null
-      const next = attempt + 1
-      setAttempt(next)
+      setAttempt(nextAttempt)
       setFailed(false)
       setLoaded(false)
-      setCurSrc(addCacheBust(item.src, next))
+      // Prefer direct src with cache-busting for retries to avoid stale blobs
+      setCurSrc(addCacheBust(item.src, nextAttempt))
       setWaiting(false)
-    }, 500)
-  }, [attempt, waiting, item.src, addCacheBust, cleanupTimer])
+    }, delay)
+  }, [addCacheBust, cleanupTimer, item.src])
+
+  const handleLoaded = React.useCallback(() => {
+    setLoaded(true)
+    setFailed(false)
+    cleanupTimer()
+  }, [cleanupTimer])
+
+  const handleError = React.useCallback(() => {
+    // Auto-retry until success or max attempts
+    const next = attempt + 1
+    if (next <= MAX_ATTEMPTS) {
+      scheduleRetry(next)
+    } else {
+      setLoaded(false)
+      setFailed(true)
+    }
+  }, [attempt, scheduleRetry])
+
+  const handleManualRetry = React.useCallback(() => {
+    if (waiting) return
+    if (attempt >= MAX_ATTEMPTS) return
+    const next = attempt + 1
+    scheduleRetry(next)
+  }, [attempt, waiting, scheduleRetry])
 
   const showAttemptBadge = attempt > 0 && !failed && !waiting && !loaded
 

@@ -73,6 +73,14 @@
   "toast.seedCreated": "已產生 {{count}} 筆奧克蘭示例數據",
   "toast.seedEnough": "已有足夠的奧克蘭示例數據",
 
+  "loading.saving": "正在儲存，請稍候…",
+  "loading.creating": "正在建立，請稍候…",
+  "loading.archiving": "正在處理歸檔，請稍候…",
+  "loading.deleting": "正在刪除，請稍候…",
+  "loading.uploading": "正在上傳，請稍候…",
+  "loading.exporting": "正在匯出，請稍候…",
+  "loading.fetching": "正在載入專案…",
+
   "err.loadFailed": "載入專案失敗：{{msg}}",
   "err.exportFailed": "匯出失敗：{{msg}}",
   "err.fetchProjectFailed": "取得專案詳情失敗：{{msg}}",
@@ -89,6 +97,7 @@
   "excel.filename": "施工安排表_{{start}}_{{end}}.xlsx",
   "pdf.title": "當月施工安排",
   "pdf.filename": "施工安排表_{{start}}_{{end}}.pdf",
+  "pdf.stageRemarks": "階段備註",
 
   "lang.zh-CN": "简体中文",
   "lang.en": "English",
@@ -202,5 +211,27 @@
   "weather.label.rainfallShort": "雨量",
   "weather.label.temperatureShort": "氣溫",
   "warn.compressingImage": "圖片過大，正在壓縮…",
-  "label.compressMedia": "上傳前壓縮圖片/影片"
+  "label.compressMedia": "上傳前壓縮圖片/影片",
+
+  "stage.glass": "玻璃",
+  "stage.frame": "框架",
+  "stage.purchase": "採購",
+  "stage.transport": "運輸",
+  "stage.install": "安裝",
+  "stage.repair": "維修",
+  "stageRemark.glass": "玻璃備註",
+  "stageRemark.frame": "框架備註",
+  "stageRemark.purchase": "採購備註",
+  "stageRemark.transport": "運輸備註",
+  "stageRemark.install": "安裝備註",
+  "stageRemark.repair": "維修備註",
+
+  "passcode.title": "請輸入存取驗證碼",
+  "passcode.desc": "為了保護系統資源，請輸入由管理員提供的 6 位存取驗證碼。",
+  "passcode.placeholder": "6 位數字",
+  "passcode.submit": "驗證並進入",
+  "passcode.ok": "驗證成功",
+  "passcode.errorRequired": "請輸入 6 位數字驗證碼",
+  "passcode.errorInvalid": "驗證碼無效",
+  "passcode.hint": "此驗證碼由認證服務提供，可在設定中心定期輪換。"
 }
