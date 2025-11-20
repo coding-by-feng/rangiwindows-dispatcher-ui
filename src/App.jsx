@@ -30,7 +30,7 @@ function AppContent() {
   const [stages, setStages] = React.useState([])
   const [includeArchived, setIncludeArchived] = React.useState(false)
   const [page, setPage] = React.useState(1)
-  const [pageSize, setPageSize] = React.useState(10)
+  const [pageSize, setPageSize] = React.useState(200) // default page size updated from 10 to 200
   const [total, setTotal] = React.useState(0)
   const [createLoading, setCreateLoading] = React.useState(false)
   const [saveLoading, setSaveLoading] = React.useState(false)
@@ -99,7 +99,7 @@ function AppContent() {
       setProjects(items)
       if (!Array.isArray(resp)) {
         setPage(Number(resp.page) || 1)
-        setPageSize(Number(resp.pageSize) || 10)
+        setPageSize(Number(resp.pageSize) || 200) // fallback updated from 10 to 200
         setTotal(Number(resp.total) || items.length)
       } else {
         setTotal(resp.length)
@@ -652,8 +652,8 @@ function AppContent() {
         onToggleCompressMedia={() => setCompressMedia(c => !c)}
       />
       {/* Add a hidden PDF export button for tests by reusing HeaderBar action area */}
-      <div style={{ display: 'none' }}>
-        <button onClick={() => onExport('pdf')}>{'导出PDF'}</button>
+      <div style={{ /* previously display: 'none' to hide test helper */ padding: 0, margin: 0 }}>
+        <button onClick={() => onExport('pdf')} data-test-id="export-pdf" style={{ display: 'inline-block', border: '1px solid transparent', background: 'transparent', padding: 0, cursor: 'pointer' }}>{'导出PDF'}</button>
       </div>
       <> {/* wrapping original return */}
         {/* Calendar and table */}

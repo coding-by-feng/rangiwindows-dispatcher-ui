@@ -279,7 +279,7 @@ async function listProjectsBackend(params = {}) {
   // New BE returns envelope { items, page, pageSize, total }
   let items = []
   let page = Number(params.page) || 1
-  let pageSize = Number(params.pageSize) || 10
+  let pageSize = Number(params.pageSize) || 200 // updated default from 10 to 200
   let total = 0
   if (Array.isArray(data)) {
     items = data
@@ -392,7 +392,7 @@ export async function listProjects(params = {}) {
     })
     .filter(p => inRange(p, params.start, params.end))
   const page = Number(params.page) || 1
-  const pageSize = Number(params.pageSize) || 10
+  const pageSize = Number(params.pageSize) || 200 // updated default from 10 to 200
   const total = filtered.length
   const startIdx = (page - 1) * pageSize
   const items = filtered.slice(startIdx, startIdx + pageSize)

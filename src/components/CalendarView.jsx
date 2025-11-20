@@ -28,19 +28,32 @@ const LOCATION_COORDS = {
   christchurch: { latitude: -43.5321, longitude: 172.6365, timezone: 'Pacific/Auckland' }
 }
 
+function salespersonColor(name) {
+  if (!name) return '#d1d5db' // lighter gray
+  // pastel/light palette for better contrast with black text
+  const palette = ['#bfdbfe', '#bbf7d0', '#fbcfe8', '#fecaca', '#ddd6fe', '#fed7aa', '#bae6fd', '#d9f99d']
+  let h = 0
+  for (let i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) >>> 0
+  return palette[h % palette.length]
+}
+
 function toEvents(projects, t) {
   const list = Array.isArray(projects) ? projects : []
   return list.map(p => {
     const st = p.stages || {}
     const order = ['repair','install','transport','purchase','frame','glass']
     const first = order.find(k => !!st[k])
-    const label = first ? t(`stage.${first}`) : ''
+    const stageLabel = first ? t(`stage.${first}`) : ''
     return ({
       id: String(p.id),
-      title: `${p.installer || '-'} / ${label || '-'}`,
+      title: p.name || '-',
       start: p.start_date || undefined,
       end: p.end_date ? dayjs(p.end_date).add(1, 'day').format('YYYY-MM-DD') : undefined,
       allDay: true,
+      extendedProps: {
+        salesperson: p.sales_person || '-',
+        stage: stageLabel || '-',
+      },
     })
   })
 }
@@ -182,6 +195,47 @@ export default function CalendarView({ projects, onEventClick, location, weather
           dayHeaderFormat={isMobile ? { weekday: 'narrow' } : undefined}
           eventClick={(info) => onEventClick(info.event.id)}
           events={events}
+          eventContent={(arg) => {
+            const { event } = arg
+            const sp = event.extendedProps.salesperson
+            const stg = event.extendedProps.stage
+            const color = salespersonColor(sp)
+            return {
+              domNodes: [
+                (() => {
+                  const outer = document.createElement('div')
+                  outer.style.display = 'flex'
+                  outer.style.flexDirection = 'column'
+                  outer.style.alignItems = 'flex-start'
+                  outer.style.fontSize = '11px'
+                  outer.style.lineHeight = '1.15'
+                  outer.style.padding = '2px 3px'
+                  outer.style.borderRadius = '4px'
+                  outer.style.backgroundColor = color
+                  outer.style.color = '#000'
+                  outer.style.fontWeight = '500'
+                  outer.style.boxShadow = 'inset 0 0 0 1px rgba(0,0,0,0.05)'
+                  const titleEl = document.createElement('span')
+                  titleEl.textContent = event.title
+                  titleEl.style.fontWeight = '600'
+                  titleEl.style.fontSize = '11px'
+                  titleEl.style.color = '#000'
+                  outer.appendChild(titleEl)
+                  const salesEl = document.createElement('span')
+                  salesEl.textContent = sp
+                  salesEl.style.fontSize = '10px'
+                  salesEl.style.color = '#000'
+                  outer.appendChild(salesEl)
+                  const stageEl = document.createElement('span')
+                  stageEl.textContent = stg
+                  stageEl.style.fontSize = '10px'
+                  stageEl.style.color = '#000'
+                  outer.appendChild(stageEl)
+                  return outer
+                })()
+              ]
+            }
+          }}
           headerToolbar={{ left: 'prev,next', center: 'title', right: 'today' }}
           locales={[zhCnLocale, zhTwLocale]}
           locale={localeStr}

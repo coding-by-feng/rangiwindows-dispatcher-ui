@@ -6,8 +6,13 @@ import { useTranslation } from 'react-i18next'
 
 export default function ProjectTable({ projects = [], loading, onRowClick, pagination }) {
   const screens = Grid.useBreakpoint()
-  const isMobile = !screens.sm
+  // Treat tablets (md) as mobile by switching to mobile layout until large breakpoint
+  const isMobile = !screens.lg
   const { t } = useTranslation()
+
+  // default page size
+  const DEFAULT_PAGE_SIZE = 200
+  const PAGE_SIZE_OPTIONS = ['50','100','200','500','1000','2000']
 
   // localStorage keys
   const LS_COLUMNS_KEY = 'projectTable.columns.v2'
@@ -168,6 +173,7 @@ export default function ProjectTable({ projects = [], loading, onRowClick, pagin
           const end = p.end_date ? dayjs(p.end_date).format('YYYY-MM-DD') : '-'
           const st = p.stages || {}
           const done = ['repair','install','transport','purchase','frame','glass'].filter(k => !!st[k])
+            .sort((a,b) => ['repair','install','transport','purchase','frame','glass'].indexOf(a) - ['repair','install','transport','purchase','frame','glass'].indexOf(b))
           const chips = done.slice(0, 2).map(k => t(`stage.${k}`)).join('、') || '-'
           return (
             <button
@@ -196,10 +202,11 @@ export default function ProjectTable({ projects = [], loading, onRowClick, pagin
           <Pagination
             size="small"
             current={pagination?.page}
-            pageSize={pagination?.pageSize}
+            pageSize={pagination?.pageSize || DEFAULT_PAGE_SIZE}
             total={pagination?.total}
-            showSizeChanger={false}
-            onChange={pagination?.onChange}
+            showSizeChanger={true}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            onChange={(page, pageSize) => pagination?.onChange?.(page, pageSize)}
           />
         </div>
       </div>
@@ -222,9 +229,10 @@ export default function ProjectTable({ projects = [], loading, onRowClick, pagin
       )}
       pagination={{
         current: pagination?.page,
-        pageSize: pagination?.pageSize || 10,
+        pageSize: pagination?.pageSize || DEFAULT_PAGE_SIZE,
         total: pagination?.total,
-        showSizeChanger: false,
+        showSizeChanger: true,
+        pageSizeOptions: PAGE_SIZE_OPTIONS,
         onChange: pagination?.onChange,
       }}
       onChange={handleTableChange}
